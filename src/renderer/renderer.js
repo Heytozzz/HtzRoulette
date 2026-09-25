@@ -36,6 +36,18 @@ const els = {
   autoWaitInput: document.getElementById('autoWaitInput'),
   eliminatedLogList: document.getElementById('eliminatedLogList'),
   winnersLogList: document.getElementById('winnersLogList'),
+
+  manualNameInput: document.getElementById('manualNameInput'),
+  manualSubCheckbox: document.getElementById('manualSubCheckbox'),
+  manualSubTier: document.getElementById('manualSubTier'),
+  manualAddBtn: document.getElementById('manualAddBtn'),
+  shuffleBtn: document.getElementById('shuffleBtn'),
+
+  subBonusCheckbox: document.getElementById('subBonusCheckbox'),
+  subBonusRow: document.getElementById('subBonusRow'),
+  subExtraTier1: document.getElementById('subExtraTier1'),
+  subExtraTier2: document.getElementById('subExtraTier2'),
+  subExtraTier3: document.getElementById('subExtraTier3'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -75,6 +87,12 @@ function getSettings() {
     winnersCount: Math.max(2, Number(els.winnersCountInput.value) || 2),
     autoMode: els.autoModeCheckbox.checked,
     autoWaitMs: Math.max(0, Number(els.autoWaitInput.value) || 0) * 1000,
+    subBonusEnabled: els.subBonusCheckbox.checked,
+    subExtra: {
+      1: Math.max(0, Number(els.subExtraTier1.value) || 0),
+      2: Math.max(0, Number(els.subExtraTier2.value) || 0),
+      3: Math.max(0, Number(els.subExtraTier3.value) || 0),
+    },
   };
 }
 
@@ -100,12 +118,17 @@ function updateSettingsVisibility() {
   // Automatic mode only makes sense for repeated spins: elimination, or sequential winners
   const canAuto = mode === 'elimination' || (mode === 'winners' && els.winnersSubMode.value === 'sequential');
   els.autoModeRow.classList.toggle('hidden', !canAuto);
+  els.subBonusRow.classList.toggle('hidden', !els.subBonusCheckbox.checked);
 
   drawWheel();
 }
 
-[els.modeSelect, els.eliminationSubMode, els.winnersSubMode].forEach((el) => {
+[els.modeSelect, els.eliminationSubMode, els.winnersSubMode, els.subBonusCheckbox].forEach((el) => {
   el.addEventListener('change', updateSettingsVisibility);
+});
+
+els.manualSubCheckbox.addEventListener('change', () => {
+  els.manualSubTier.classList.toggle('hidden', !els.manualSubCheckbox.checked);
 });
 
 // --- Participants list ---
@@ -117,17 +140,59 @@ function renderParticipants() {
     els.participantList.appendChild(li);
     return;
   }
-  state.participants.forEach((name) => {
+  state.participants.forEach((name, index) => {
     const li = document.createElement('li');
-    li.textContent = name;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = name;
+    li.appendChild(nameSpan);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.title = t('removeTitle');
+    removeBtn.addEventListener('click', () => removeParticipantAt(index));
+    li.appendChild(removeBtn);
+
     els.participantList.appendChild(li);
   });
 }
 
+function removeParticipantAt(index) {
+  state.participants.splice(index, 1);
+  renderParticipants();
+  drawWheel();
+}
+
+// Twitch chat join: one entry per !join, de-duplicated to prevent chat spam
 function addParticipant(name) {
   if (!name) return;
   if (state.participants.includes(name)) return;
   state.participants.push(name);
+  renderParticipants();
+  drawWheel();
+}
+
+// Manual add: allows duplicates on purpose, so sub-bonus extra entries work
+function addManualParticipant(name, isSub, tier) {
+  if (!name) return;
+  const settings = getSettings();
+  let copies = 1;
+  if (settings.subBonusEnabled && isSub) {
+    copies += settings.subExtra[tier] || 0;
+  }
+  for (let i = 0; i < copies; i += 1) {
+    state.participants.push(name);
+  }
+  renderParticipants();
+  drawWheel();
+}
+
+function shuffleParticipants() {
+  for (let i = state.participants.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [state.participants[i], state.participants[j]] = [state.participants[j], state.participants[i]];
+  }
   renderParticipants();
   drawWheel();
 }
@@ -424,6 +489,21 @@ window.htz.onParticipant((username) => {
 
 els.spinBtn.addEventListener('click', spin);
 els.resetBtn.addEventListener('click', resetParticipants);
+
+els.manualAddBtn.addEventListener('click', () => {
+  const name = els.manualNameInput.value.trim();
+  if (!name) return;
+  const isSub = els.manualSubCheckbox.checked;
+  const tier = Number(els.manualSubTier.value);
+  addManualParticipant(name, isSub, tier);
+  els.manualNameInput.value = '';
+});
+
+els.manualNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') els.manualAddBtn.click();
+});
+
+els.shuffleBtn.addEventListener('click', shuffleParticipants);
 
 // --- Init ---
 loadStrings().then(() => {

@@ -25,6 +25,22 @@
     <section class="participants">
       <h2 data-i18n="participantsTitle">Participantes</h2>
       <ul id="participantList"></ul>
+
+      <div class="add-participant">
+        <input id="manualNameInput" type="text" data-i18n-placeholder="manualNamePlaceholder" placeholder="Nombre" />
+        <label class="inline-label">
+          <input id="manualSubCheckbox" type="checkbox" />
+          <span data-i18n="isSubLabel">Es sub</span>
+        </label>
+        <select id="manualSubTier" class="hidden">
+          <option value="1" data-i18n="tier1">Tier 1</option>
+          <option value="2" data-i18n="tier2">Tier 2</option>
+          <option value="3" data-i18n="tier3">Tier 3</option>
+        </select>
+        <button id="manualAddBtn" data-i18n="addBtn">Añadir</button>
+      </div>
+
+      <button id="shuffleBtn" data-i18n="shuffleBtn">Barajear</button>
     </section>
 
     <section class="wheel-section">
@@ -79,6 +95,21 @@
         </label>
         <label data-i18n="autoWaitLabel">Espera entre giros (segundos)</label>
         <input id="autoWaitInput" type="number" min="0" max="30" step="0.5" value="3" />
+      </div>
+
+      <div class="mode-options">
+        <label class="inline-label">
+          <input id="subBonusCheckbox" type="checkbox" />
+          <span data-i18n="subBonusLabel">Activar bonificación de sub</span>
+        </label>
+        <div id="subBonusRow" class="hidden">
+          <label data-i18n="extraTier1Label">Extra Tier 1</label>
+          <input id="subExtraTier1" type="number" min="0" max="20" value="1" />
+          <label data-i18n="extraTier2Label">Extra Tier 2</label>
+          <input id="subExtraTier2" type="number" min="0" max="20" value="2" />
+          <label data-i18n="extraTier3Label">Extra Tier 3</label>
+          <input id="subExtraTier3" type="number" min="0" max="20" value="3" />
+        </div>
       </div>
 
       <div class="log-section">

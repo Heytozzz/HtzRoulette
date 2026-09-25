@@ -33,5 +33,17 @@
   "winnersLog": "Ganadores",
   "roundEliminated": "Eliminado: {names}",
   "finalWinner": "¡Ganador final: {name}!",
-  "finalWinnerTie": "¡Ganadores finales: {names}!"
+  "finalWinnerTie": "¡Ganadores finales: {names}!",
+  "manualNamePlaceholder": "Nombre",
+  "isSubLabel": "Es sub",
+  "tier1": "Tier 1",
+  "tier2": "Tier 2",
+  "tier3": "Tier 3",
+  "addBtn": "Añadir",
+  "shuffleBtn": "Barajear",
+  "subBonusLabel": "Activar bonificación de sub",
+  "extraTier1Label": "Extra Tier 1",
+  "extraTier2Label": "Extra Tier 2",
+  "extraTier3Label": "Extra Tier 3",
+  "removeTitle": "Quitar"
 }

@@ -102,6 +102,44 @@ main {
 .participants li {
   padding: 4px 8px;
   border-bottom: 1px solid #2a2b31;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.participants li .remove-btn {
+  background: transparent;
+  color: #ff6b6b;
+  border: none;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.participants li .remove-btn:hover {
+  color: #ff2020;
+}
+
+.add-participant {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.add-participant .inline-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #b8b8c0;
+}
+
+#shuffleBtn {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .wheel-section {
