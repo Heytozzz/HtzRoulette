@@ -45,5 +45,9 @@
   "extraTier1Label": "Extra Tier 1",
   "extraTier2Label": "Extra Tier 2",
   "extraTier3Label": "Extra Tier 3",
-  "removeTitle": "Quitar"
+  "removeTitle": "Quitar",
+  "exportBtn": "Exportar",
+  "importBtn": "Importar",
+  "importExportPlaceholder": "Un nombre por línea",
+  "finalWinnersCountLabel": "Ganadores finales"
 }

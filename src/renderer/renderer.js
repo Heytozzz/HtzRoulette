@@ -42,6 +42,11 @@ const els = {
   manualSubTier: document.getElementById('manualSubTier'),
   manualAddBtn: document.getElementById('manualAddBtn'),
   shuffleBtn: document.getElementById('shuffleBtn'),
+  exportBtn: document.getElementById('exportBtn'),
+  importBtn: document.getElementById('importBtn'),
+  importExportArea: document.getElementById('importExportArea'),
+
+  eliminationFinalWinnersCount: document.getElementById('eliminationFinalWinnersCount'),
 
   subBonusCheckbox: document.getElementById('subBonusCheckbox'),
   subBonusRow: document.getElementById('subBonusRow'),
@@ -83,6 +88,7 @@ function getSettings() {
     mode: els.modeSelect.value, // normal | elimination | winners
     eliminationSubMode: els.eliminationSubMode.value, // simple | multiple
     eliminationArrowCount: Math.max(2, Number(els.eliminationArrowCount.value) || 2),
+    eliminationFinalWinnersCount: Math.max(1, Number(els.eliminationFinalWinnersCount.value) || 1),
     winnersSubMode: els.winnersSubMode.value, // sequential | simultaneous
     winnersCount: Math.max(2, Number(els.winnersCountInput.value) || 2),
     autoMode: els.autoModeCheckbox.checked,
@@ -99,7 +105,8 @@ function getSettings() {
 function pointerCountForCurrentSettings() {
   const s = getSettings();
   if (s.mode === 'elimination' && s.eliminationSubMode === 'multiple') {
-    return Math.min(s.eliminationArrowCount, Math.max(1, state.participants.length));
+    const maxRemovable = Math.max(1, state.participants.length - s.eliminationFinalWinnersCount);
+    return Math.min(s.eliminationArrowCount, maxRemovable, Math.max(1, state.participants.length));
   }
   if (s.mode === 'winners' && s.winnersSubMode === 'simultaneous') {
     return Math.min(s.winnersCount, Math.max(1, state.participants.length));
@@ -326,21 +333,29 @@ function spin() {
   // Anchor slice for pointer 0; other pointers fall out naturally from the rotation
   const anchorIndex = Math.floor(Math.random() * count);
   const targetSliceCenter = anchorIndex * sliceAngle + sliceAngle / 2;
-  const extraSpins = 5 + Math.floor(Math.random() * 3);
+  const extraSpins = 8 + Math.floor(Math.random() * 4);
   const targetRotation = extraSpins * Math.PI * 2 - targetSliceCenter;
 
   const startRotation = state.rotation;
   const duration = settings.spinDurationMs;
   const startTime = performance.now();
 
-  function easeOutCubic(x) {
-    return 1 - Math.pow(1 - x, 3);
+  function spinEasing(x) {
+    // Fast ramp-up in the first 10% of the animation, then a long ease-out slowdown
+    const rampFraction = 0.1;
+    const rampDistance = 0.18;
+    if (x < rampFraction) {
+      return (x / rampFraction) * rampDistance;
+    }
+    const remaining = (x - rampFraction) / (1 - rampFraction);
+    const easeOutQuart = 1 - Math.pow(1 - remaining, 4);
+    return rampDistance + (1 - rampDistance) * easeOutQuart;
   }
 
   function animate(now) {
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    const eased = easeOutCubic(progress);
+    const eased = spinEasing(progress);
     state.rotation = startRotation + (targetRotation - startRotation) * eased;
     drawWheel();
 
@@ -381,13 +396,17 @@ function onSpinComplete(results, settings) {
     renderLogs();
     els.modeStatus.textContent = t('roundEliminated', { names: results.join(', ') });
 
-    if (state.participants.length <= 1) {
-      const finalWinner = state.participants[0];
+    if (state.participants.length <= settings.eliminationFinalWinnersCount) {
+      const finalWinners = [...state.participants];
       state.spinning = true; // lock further spins, round is over
       els.spinBtn.disabled = true;
-      els.winnerText.textContent = finalWinner
-        ? t('finalWinner', { name: finalWinner })
-        : '';
+      if (finalWinners.length === 1) {
+        els.winnerText.textContent = t('finalWinner', { name: finalWinners[0] });
+      } else if (finalWinners.length > 1) {
+        els.winnerText.textContent = t('finalWinnerTie', { names: finalWinners.join(', ') });
+      } else {
+        els.winnerText.textContent = '';
+      }
       return;
     }
 
@@ -504,6 +523,26 @@ els.manualNameInput.addEventListener('keydown', (e) => {
 });
 
 els.shuffleBtn.addEventListener('click', shuffleParticipants);
+
+els.exportBtn.addEventListener('click', async () => {
+  const text = state.participants.join('\n');
+  els.importExportArea.value = text;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    // Clipboard permissions may be unavailable; the textarea still holds the list for manual copy
+  }
+});
+
+els.importBtn.addEventListener('click', () => {
+  const lines = els.importExportArea.value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  state.participants = lines;
+  renderParticipants();
+  drawWheel();
+});
 
 // --- Init ---
 loadStrings().then(() => {

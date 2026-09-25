@@ -41,6 +41,14 @@
       </div>
 
       <button id="shuffleBtn" data-i18n="shuffleBtn">Barajear</button>
+
+      <div class="import-export">
+        <div class="import-export-buttons">
+          <button id="exportBtn" data-i18n="exportBtn">Exportar</button>
+          <button id="importBtn" data-i18n="importBtn">Importar</button>
+        </div>
+        <textarea id="importExportArea" rows="4" data-i18n-placeholder="importExportPlaceholder" placeholder="Un nombre por línea"></textarea>
+      </div>
     </section>
 
     <section class="wheel-section">
@@ -76,6 +84,8 @@
           <label data-i18n="arrowCountLabel">Número de flechas</label>
           <input id="eliminationArrowCount" type="number" min="2" max="8" value="2" />
         </div>
+        <label data-i18n="finalWinnersCountLabel">Ganadores finales</label>
+        <input id="eliminationFinalWinnersCount" type="number" min="1" max="8" value="1" />
       </div>
 
       <div id="winnersOptions" class="mode-options hidden">
