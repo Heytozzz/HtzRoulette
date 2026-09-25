@@ -34,6 +34,59 @@
         <button id="resetBtn" data-i18n="reset">Reiniciar lista</button>
       </div>
       <div id="winnerText"></div>
+      <div id="modeStatus"></div>
+    </section>
+
+    <section class="settings">
+      <h2 data-i18n="settingsTitle">Configuración</h2>
+
+      <label data-i18n="spinDurationLabel">Duración del giro (segundos)</label>
+      <input id="spinDurationInput" type="number" min="1" max="15" step="0.5" value="4" />
+
+      <label data-i18n="modeLabel">Modo</label>
+      <select id="modeSelect">
+        <option value="normal" data-i18n="modeNormal">Normal</option>
+        <option value="elimination" data-i18n="modeElimination">Eliminatoria</option>
+        <option value="winners" data-i18n="modeWinners">Ganadores múltiples</option>
+      </select>
+
+      <div id="eliminationOptions" class="mode-options hidden">
+        <label data-i18n="eliminationSubLabel">Tipo de eliminatoria</label>
+        <select id="eliminationSubMode">
+          <option value="simple" data-i18n="eliminationSimple">Sencilla</option>
+          <option value="multiple" data-i18n="eliminationMultiple">Múltiple</option>
+        </select>
+        <div id="eliminationArrowRow" class="hidden">
+          <label data-i18n="arrowCountLabel">Número de flechas</label>
+          <input id="eliminationArrowCount" type="number" min="2" max="8" value="2" />
+        </div>
+      </div>
+
+      <div id="winnersOptions" class="mode-options hidden">
+        <label data-i18n="winnersSubLabel">Tipo de selección</label>
+        <select id="winnersSubMode">
+          <option value="sequential" data-i18n="winnersSequential">Varios giros</option>
+          <option value="simultaneous" data-i18n="winnersSimultaneous">Simultáneo</option>
+        </select>
+        <label data-i18n="winnersCountLabel">Número de ganadores</label>
+        <input id="winnersCountInput" type="number" min="2" max="8" value="2" />
+      </div>
+
+      <div id="autoModeRow" class="mode-options hidden">
+        <label>
+          <input id="autoModeCheckbox" type="checkbox" />
+          <span data-i18n="autoModeLabel">Modo automático</span>
+        </label>
+        <label data-i18n="autoWaitLabel">Espera entre giros (segundos)</label>
+        <input id="autoWaitInput" type="number" min="0" max="30" step="0.5" value="3" />
+      </div>
+
+      <div class="log-section">
+        <h3 data-i18n="eliminatedLog">Eliminados</h3>
+        <ul id="eliminatedLogList"></ul>
+        <h3 data-i18n="winnersLog">Ganadores</h3>
+        <ul id="winnersLogList"></ul>
+      </div>
     </section>
   </main>
 
