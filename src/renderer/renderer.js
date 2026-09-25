@@ -56,7 +56,10 @@ const els = {
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
-const colors = ['#6441a5', '#9147ff', '#e91916', '#00b7ff', '#00c853', '#ffb300', '#ff4081', '#3f51b5'];
+function getSliceColor(index, count) {
+  const hue = (index * 360) / count;
+  return `hsl(${hue}, 65%, 50%)`;
+}
 
 // --- i18n (basic, Spanish only for now, structure ready for more languages) ---
 let strings = {};
@@ -252,7 +255,7 @@ function drawWheel() {
     ctx.moveTo(0, 0);
     ctx.arc(0, 0, radius, start, end);
     ctx.closePath();
-    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillStyle = getSliceColor(i, count);
     ctx.fill();
 
     ctx.save();
@@ -300,22 +303,24 @@ function normalizeAngle(angle) {
 }
 
 // Given the wheel's final rotation and the pointer angles, work out which
-// participant sits under each pointer (slices are laid out starting at angle 0
-// in wheel-space, then rotated by `rotation`).
-function getResultsForRotation(rotation, pointerCount) {
+// slot (by index) sits under each pointer (slices are laid out starting at
+// angle 0 in wheel-space, then rotated by `rotation`). Returns unique slot
+// indices plus their names, so a name with several extra slots only ever
+// loses/wins the exact slot that was picked.
+function getSelectionForRotation(rotation, pointerCount) {
   const count = state.participants.length;
-  if (count === 0) return [];
+  if (count === 0) return { indices: [], names: [] };
   const sliceAngle = (Math.PI * 2) / count;
   const pointerAngles = getPointerAngles(pointerCount);
 
-  const indices = pointerAngles.map((angle) => {
+  const rawIndices = pointerAngles.map((angle) => {
     const wheelSpaceAngle = normalizeAngle(angle - rotation);
     return Math.floor(wheelSpaceAngle / sliceAngle) % count;
   });
 
-  // De-duplicate in case two pointers land on the same slice
-  const uniqueIndices = [...new Set(indices)];
-  return uniqueIndices.map((i) => state.participants[i]).sort((a, b) => a.localeCompare(b));
+  const indices = [...new Set(rawIndices)];
+  const names = indices.map((i) => state.participants[i]);
+  return { indices, names };
 }
 
 // --- Spin logic ---
@@ -334,9 +339,16 @@ function spin() {
   const anchorIndex = Math.floor(Math.random() * count);
   const targetSliceCenter = anchorIndex * sliceAngle + sliceAngle / 2;
   const extraSpins = 8 + Math.floor(Math.random() * 4);
-  const targetRotation = extraSpins * Math.PI * 2 - targetSliceCenter;
 
   const startRotation = state.rotation;
+  // Same amount of "force" every spin: always add extraSpins full turns on top
+  // of the current rotation, then just enough extra to land pointer 0 on the
+  // chosen slice (never subtract from where the wheel already is).
+  const desiredMod = normalizeAngle(-targetSliceCenter);
+  const currentMod = normalizeAngle(startRotation);
+  const alignmentDelta = normalizeAngle(desiredMod - currentMod);
+  const targetRotation = startRotation + alignmentDelta + extraSpins * Math.PI * 2;
+
   const duration = settings.spinDurationMs;
   const startTime = performance.now();
 
@@ -362,15 +374,16 @@ function spin() {
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
-      onSpinComplete(getResultsForRotation(state.rotation, pointerCount), settings);
+      onSpinComplete(getSelectionForRotation(state.rotation, pointerCount), settings);
     }
   }
 
   requestAnimationFrame(animate);
 }
 
-function removeParticipants(names) {
-  state.participants = state.participants.filter((p) => !names.includes(p));
+function removeIndices(indices) {
+  const indexSet = new Set(indices);
+  state.participants = state.participants.filter((_, i) => !indexSet.has(i));
 }
 
 function scheduleAutoSpin(waitMs) {
@@ -380,30 +393,33 @@ function scheduleAutoSpin(waitMs) {
   }, waitMs);
 }
 
-function onSpinComplete(results, settings) {
+function onSpinComplete(selection, settings) {
   state.spinning = false;
+  const { indices, names } = selection;
+  const uniqueRoundNames = [...new Set(names)];
 
   if (settings.mode === 'normal') {
-    els.winnerText.textContent = t('winner', { name: results[0] });
+    els.winnerText.textContent = t('winner', { name: names[0] });
     els.spinBtn.disabled = false;
     return;
   }
 
   if (settings.mode === 'elimination') {
-    state.eliminatedLog.push(...results);
-    removeParticipants(results);
+    state.eliminatedLog.push(...uniqueRoundNames);
+    removeIndices(indices);
     renderParticipants();
     renderLogs();
-    els.modeStatus.textContent = t('roundEliminated', { names: results.join(', ') });
+    els.modeStatus.textContent = t('roundEliminated', { names: uniqueRoundNames.join(', ') });
 
-    if (state.participants.length <= settings.eliminationFinalWinnersCount) {
-      const finalWinners = [...state.participants];
+    // A person with several extra slots still counts as ONE remaining winner
+    const remainingUniqueNames = [...new Set(state.participants)];
+    if (remainingUniqueNames.length <= settings.eliminationFinalWinnersCount) {
       state.spinning = true; // lock further spins, round is over
       els.spinBtn.disabled = true;
-      if (finalWinners.length === 1) {
-        els.winnerText.textContent = t('finalWinner', { name: finalWinners[0] });
-      } else if (finalWinners.length > 1) {
-        els.winnerText.textContent = t('finalWinnerTie', { names: finalWinners.join(', ') });
+      if (remainingUniqueNames.length === 1) {
+        els.winnerText.textContent = t('finalWinner', { name: remainingUniqueNames[0] });
+      } else if (remainingUniqueNames.length > 1) {
+        els.winnerText.textContent = t('finalWinnerTie', { names: remainingUniqueNames.join(', ') });
       } else {
         els.winnerText.textContent = '';
       }
@@ -421,23 +437,29 @@ function onSpinComplete(results, settings) {
 
   if (settings.mode === 'winners') {
     if (settings.winnersSubMode === 'simultaneous') {
-      state.winnersLog.push(...results);
-      removeParticipants(results);
+      // A person with several extra slots only ever counts as ONE winner
+      uniqueRoundNames.forEach((name) => {
+        if (!state.winnersLog.includes(name)) state.winnersLog.push(name);
+      });
+      removeIndices(indices);
       renderParticipants();
       renderLogs();
-      els.winnerText.textContent = t('winnersLabel', { names: results.join(', ') });
+      els.winnerText.textContent = t('winnersLabel', { names: uniqueRoundNames.join(', ') });
       els.spinBtn.disabled = false;
       return;
     }
 
-    // sequential
-    state.winnersLog.push(...results);
-    removeParticipants(results);
+    // sequential: one slot per spin; if that person already won, their slot is
+    // simply retired without counting as a second win
+    const name = names[0];
+    removeIndices(indices);
+    if (!state.winnersLog.includes(name)) state.winnersLog.push(name);
     renderParticipants();
     renderLogs();
     els.modeStatus.textContent = `${state.winnersLog.length}/${settings.winnersCount}`;
 
-    const done = state.winnersLog.length >= settings.winnersCount || state.participants.length === 0;
+    const remainingUniqueNames = new Set(state.participants).size;
+    const done = state.winnersLog.length >= settings.winnersCount || remainingUniqueNames === 0;
     if (done) {
       els.winnerText.textContent = t('finalWinnerTie', { names: state.winnersLog.join(', ') });
       els.spinBtn.disabled = true;
