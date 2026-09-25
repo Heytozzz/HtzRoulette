@@ -1,0 +1,15 @@
+{
+  "title": "HtzRoulette",
+  "channelLabel": "Canal de Twitch",
+  "channelPlaceholder": "nombre_del_canal",
+  "connect": "Conectar",
+  "disconnect": "Desconectar",
+  "joinCommandLabel": "Comando para unirse",
+  "statusDisconnected": "Desconectado",
+  "statusConnected": "Conectado a {channel}",
+  "participantsTitle": "Participantes",
+  "empty": "Aún no hay participantes",
+  "spin": "Girar",
+  "reset": "Reiniciar lista",
+  "winner": "¡Ganador: {name}!"
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>HtzRoulette</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1 data-i18n="title">HtzRoulette</h1>
+    <div class="connection-bar">
+      <label data-i18n="channelLabel">Canal de Twitch</label>
+      <input id="channelInput" type="text" data-i18n-placeholder="channelPlaceholder" placeholder="nombre_del_canal" />
+      <button id="connectBtn" data-i18n="connect">Conectar</button>
+      <button id="disconnectBtn" data-i18n="disconnect" disabled>Desconectar</button>
+      <span id="statusText" data-i18n="statusDisconnected">Desconectado</span>
+    </div>
+    <div class="join-command-bar">
+      <label data-i18n="joinCommandLabel">Comando para unirse</label>
+      <input id="joinCommandInput" type="text" value="!join" />
+    </div>
+  </header>
+
+  <main>
+    <section class="participants">
+      <h2 data-i18n="participantsTitle">Participantes</h2>
+      <ul id="participantList"></ul>
+    </section>
+
+    <section class="wheel-section">
+      <canvas id="wheelCanvas" width="400" height="400"></canvas>
+      <div class="controls">
+        <button id="spinBtn" data-i18n="spin">Girar</button>
+        <button id="resetBtn" data-i18n="reset">Reiniciar lista</button>
+      </div>
+      <div id="winnerText"></div>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
