@@ -49,5 +49,16 @@
   "exportBtn": "Exportar",
   "importBtn": "Importar",
   "importExportPlaceholder": "Un nombre por línea",
-  "finalWinnersCountLabel": "Ganadores finales"
+  "finalWinnersCountLabel": "Ganadores finales",
+  "settingsGearTitle": "Aspecto",
+  "appearanceTitle": "Aspecto",
+  "closeBtn": "Cerrar",
+  "rouletteSubcategory": "Ruleta",
+  "colorPaletteLabel": "Paleta de colores",
+  "presetRed": "Rojo",
+  "presetBlue": "Azul",
+  "presetGreen": "Verde",
+  "presetPurple": "Morado",
+  "presetGray": "Gris",
+  "presetRainbow": "Arcoíris"
 }

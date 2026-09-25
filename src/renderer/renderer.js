@@ -7,6 +7,7 @@ const state = {
   eliminatedLog: [],
   winnersLog: [],
   autoTimer: null,
+  colorPalette: 'red',
 };
 
 const els = {
@@ -53,12 +54,56 @@ const els = {
   subExtraTier1: document.getElementById('subExtraTier1'),
   subExtraTier2: document.getElementById('subExtraTier2'),
   subExtraTier3: document.getElementById('subExtraTier3'),
+
+  gearBtn: document.getElementById('gearBtn'),
+  appearanceModal: document.getElementById('appearanceModal'),
+  closeAppearanceModal: document.getElementById('closeAppearanceModal'),
+  colorPaletteSelect: document.getElementById('colorPaletteSelect'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
+const COLOR_PALETTES = {
+  red: ['#050505', '#2b2b2b', '#4d0000', '#8b0000', '#c1121f', '#e85d5d', '#ffb3b3'],
+  blue: ['#050505', '#2b2b2b', '#00204d', '#003f8b', '#1261c1', '#4d9de8', '#b3d4ff'],
+  green: ['#050505', '#2b2b2b', '#0a3d0a', '#146b14', '#2ea52e', '#6fd66f', '#c8f7c8'],
+  purple: ['#050505', '#2b2b2b', '#2d004d', '#4b0082', '#6a1cad', '#9b5de5', '#dcb8ff'],
+  gray: ['#050505', '#2b2b2b', '#4d4d4d', '#7a7a7a', '#a8a8a8', '#cfcfcf', '#f0f0f0'],
+};
+
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '');
+  return {
+    r: parseInt(clean.substring(0, 2), 16),
+    g: parseInt(clean.substring(2, 4), 16),
+    b: parseInt(clean.substring(4, 6), 16),
+  };
+}
+
+function lerpHexColor(hexA, hexB, frac) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  const r = Math.round(a.r + (b.r - a.r) * frac);
+  const g = Math.round(a.g + (b.g - a.g) * frac);
+  const bl = Math.round(a.b + (b.b - a.b) * frac);
+  return `rgb(${r}, ${g}, ${bl})`;
+}
+
 function getSliceColor(index, count) {
-  const hue = (index * 360) / count;
-  return `hsl(${hue}, 65%, 50%)`;
+  if (state.colorPalette === 'rainbow') {
+    const hue = (index * 360) / count;
+    return `hsl(${hue}, 65%, 50%)`;
+  }
+
+  const stops = COLOR_PALETTES[state.colorPalette] || COLOR_PALETTES.red;
+  const posInCircle = index / count; // 0..1 around the wheel
+  // Triangle wave (0 -> 1 -> 0) so the gradient loops smoothly: dark at the
+  // seam between the first and last slice, brightest in the middle.
+  const triangle = posInCircle < 0.5 ? posInCircle * 2 : (1 - posInCircle) * 2;
+  const scaled = triangle * (stops.length - 1);
+  const lower = Math.floor(scaled);
+  const upper = Math.min(stops.length - 1, lower + 1);
+  const frac = scaled - lower;
+  return lerpHexColor(stops[lower], stops[upper], frac);
 }
 
 // --- i18n (basic, Spanish only for now, structure ready for more languages) ---
@@ -73,6 +118,10 @@ async function loadStrings() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     const key = el.getAttribute('data-i18n-placeholder');
     if (strings[key]) el.setAttribute('placeholder', strings[key]);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-title');
+    if (strings[key]) el.setAttribute('title', strings[key]);
   });
 }
 
@@ -174,11 +223,19 @@ function removeParticipantAt(index) {
   drawWheel();
 }
 
-// Twitch chat join: one entry per !join, de-duplicated to prevent chat spam
-function addParticipant(name) {
-  if (!name) return;
-  if (state.participants.includes(name)) return;
-  state.participants.push(name);
+// Twitch chat join: one entry per person, plus their sub bonus extras (Tier 1)
+// applied immediately if the bonus is enabled and Twitch reports them as a subscriber.
+function addParticipant(username, isSub) {
+  if (!username) return;
+  if (state.participants.includes(username)) return;
+  const settings = getSettings();
+  let copies = 1;
+  if (settings.subBonusEnabled && isSub) {
+    copies += settings.subExtra[1] || 0;
+  }
+  for (let i = 0; i < copies; i += 1) {
+    state.participants.push(username);
+  }
   renderParticipants();
   drawWheel();
 }
@@ -524,8 +581,8 @@ window.htz.onStatus((status) => {
   }
 });
 
-window.htz.onParticipant((username) => {
-  addParticipant(username);
+window.htz.onParticipant((payload) => {
+  addParticipant(payload.username, payload.isSub);
 });
 
 els.spinBtn.addEventListener('click', spin);
@@ -545,6 +602,23 @@ els.manualNameInput.addEventListener('keydown', (e) => {
 });
 
 els.shuffleBtn.addEventListener('click', shuffleParticipants);
+
+els.gearBtn.addEventListener('click', () => {
+  els.appearanceModal.classList.remove('hidden');
+});
+
+els.closeAppearanceModal.addEventListener('click', () => {
+  els.appearanceModal.classList.add('hidden');
+});
+
+els.appearanceModal.addEventListener('click', (e) => {
+  if (e.target === els.appearanceModal) els.appearanceModal.classList.add('hidden');
+});
+
+els.colorPaletteSelect.addEventListener('change', () => {
+  state.colorPalette = els.colorPaletteSelect.value;
+  drawWheel();
+});
 
 els.exportBtn.addEventListener('click', async () => {
   const text = state.participants.join('\n');
@@ -568,6 +642,7 @@ els.importBtn.addEventListener('click', () => {
 
 // --- Init ---
 loadStrings().then(() => {
+  els.colorPaletteSelect.value = state.colorPalette;
   renderParticipants();
   renderLogs();
   updateSettingsVisibility();

@@ -7,7 +7,10 @@
 </head>
 <body>
   <header>
-    <h1 data-i18n="title">HtzRoulette</h1>
+    <div class="header-top">
+      <h1 data-i18n="title">HtzRoulette</h1>
+      <button id="gearBtn" class="gear-btn" title="Aspecto" data-i18n-title="settingsGearTitle">⚙</button>
+    </div>
     <div class="connection-bar">
       <label data-i18n="channelLabel">Canal de Twitch</label>
       <input id="channelInput" type="text" data-i18n-placeholder="channelPlaceholder" placeholder="nombre_del_canal" />
@@ -130,6 +133,25 @@
       </div>
     </section>
   </main>
+
+  <div id="appearanceModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 data-i18n="appearanceTitle">Aspecto</h2>
+        <button id="closeAppearanceModal" class="close-btn" data-i18n="closeBtn">Cerrar</button>
+      </div>
+      <h3 data-i18n="rouletteSubcategory">Ruleta</h3>
+      <label data-i18n="colorPaletteLabel">Paleta de colores</label>
+      <select id="colorPaletteSelect">
+        <option value="red" data-i18n="presetRed">Rojo</option>
+        <option value="blue" data-i18n="presetBlue">Azul</option>
+        <option value="green" data-i18n="presetGreen">Verde</option>
+        <option value="purple" data-i18n="presetPurple">Morado</option>
+        <option value="gray" data-i18n="presetGray">Gris</option>
+        <option value="rainbow" data-i18n="presetRainbow">Arcoíris</option>
+      </select>
+    </div>
+  </div>
 
   <script src="renderer.js"></script>
 </body>

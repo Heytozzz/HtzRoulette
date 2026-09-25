@@ -57,7 +57,11 @@ ipcMain.handle('twitch:connect', async (event, channelName) => {
     if (self) return;
     if (message.trim().toLowerCase() === joinCommand) {
       const username = tags['display-name'] || tags.username;
-      mainWindow.webContents.send('twitch:participant', username);
+      // Exact sub tier isn't reliable from a plain chat message (Twitch only
+      // sends tier info on the resub/sub notification events), so we can only
+      // detect "is currently a subscriber" here and apply the Tier 1 bonus.
+      const isSub = !!(tags.subscriber || (tags.badges && tags.badges.subscriber));
+      mainWindow.webContents.send('twitch:participant', { username, isSub });
     }
   });
 

@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('htz', {
   disconnect: () => ipcRenderer.invoke('twitch:disconnect'),
   setJoinCommand: (command) => ipcRenderer.invoke('twitch:setJoinCommand', command),
   onParticipant: (callback) => {
-    ipcRenderer.on('twitch:participant', (event, username) => callback(username));
+    ipcRenderer.on('twitch:participant', (event, payload) => callback(payload));
   },
   onStatus: (callback) => {
     ipcRenderer.on('twitch:status', (event, status) => callback(status));
