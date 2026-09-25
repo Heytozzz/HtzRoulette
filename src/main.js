@@ -40,6 +40,19 @@ async function disconnectClient() {
   }
 }
 
+// Twitch encodes the subscriber badge version as the tier number followed by
+// a month milestone once it reaches 4+ digits (e.g. "3018" = Tier 3, 18-month
+// badge); shorter values ("0".."120") are plain Tier 1 month milestones.
+function getSubTier(tags) {
+  const badgeVersion = tags.badges && tags.badges.subscriber;
+  if (!badgeVersion) return 0;
+  if (badgeVersion.length >= 4) {
+    if (badgeVersion.startsWith('3')) return 3;
+    if (badgeVersion.startsWith('2')) return 2;
+  }
+  return 1;
+}
+
 // Handle connect request from renderer
 ipcMain.handle('twitch:connect', async (event, channelName) => {
   await disconnectClient();
@@ -57,11 +70,8 @@ ipcMain.handle('twitch:connect', async (event, channelName) => {
     if (self) return;
     if (message.trim().toLowerCase() === joinCommand) {
       const username = tags['display-name'] || tags.username;
-      // Exact sub tier isn't reliable from a plain chat message (Twitch only
-      // sends tier info on the resub/sub notification events), so we can only
-      // detect "is currently a subscriber" here and apply the Tier 1 bonus.
-      const isSub = !!(tags.subscriber || (tags.badges && tags.badges.subscriber));
-      mainWindow.webContents.send('twitch:participant', { username, isSub });
+      const subTier = getSubTier(tags);
+      mainWindow.webContents.send('twitch:participant', { username, subTier });
     }
   });
 

@@ -62,31 +62,13 @@ const els = {
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
-const COLOR_PALETTES = {
-  red: ['#050505', '#2b2b2b', '#4d0000', '#8b0000', '#c1121f', '#e85d5d', '#ffb3b3'],
-  blue: ['#050505', '#2b2b2b', '#00204d', '#003f8b', '#1261c1', '#4d9de8', '#b3d4ff'],
-  green: ['#050505', '#2b2b2b', '#0a3d0a', '#146b14', '#2ea52e', '#6fd66f', '#c8f7c8'],
-  purple: ['#050505', '#2b2b2b', '#2d004d', '#4b0082', '#6a1cad', '#9b5de5', '#dcb8ff'],
-  gray: ['#050505', '#2b2b2b', '#4d4d4d', '#7a7a7a', '#a8a8a8', '#cfcfcf', '#f0f0f0'],
+const PALETTE_HUES = {
+  red: 0,
+  blue: 210,
+  green: 120,
+  purple: 275,
+  gray: 0,
 };
-
-function hexToRgb(hex) {
-  const clean = hex.replace('#', '');
-  return {
-    r: parseInt(clean.substring(0, 2), 16),
-    g: parseInt(clean.substring(2, 4), 16),
-    b: parseInt(clean.substring(4, 6), 16),
-  };
-}
-
-function lerpHexColor(hexA, hexB, frac) {
-  const a = hexToRgb(hexA);
-  const b = hexToRgb(hexB);
-  const r = Math.round(a.r + (b.r - a.r) * frac);
-  const g = Math.round(a.g + (b.g - a.g) * frac);
-  const bl = Math.round(a.b + (b.b - a.b) * frac);
-  return `rgb(${r}, ${g}, ${bl})`;
-}
 
 function getSliceColor(index, count) {
   if (state.colorPalette === 'rainbow') {
@@ -94,16 +76,17 @@ function getSliceColor(index, count) {
     return `hsl(${hue}, 65%, 50%)`;
   }
 
-  const stops = COLOR_PALETTES[state.colorPalette] || COLOR_PALETTES.red;
+  const hue = PALETTE_HUES[state.colorPalette] ?? PALETTE_HUES.red;
   const posInCircle = index / count; // 0..1 around the wheel
-  // Triangle wave (0 -> 1 -> 0) so the gradient loops smoothly: dark at the
-  // seam between the first and last slice, brightest in the middle.
+  // Triangle wave (0 -> 1 -> 0): 0 at the seam between first/last slice, 1 in
+  // the middle. The seam always stays a dark, hue-tinted gray (never pure
+  // black); the middle is the fully saturated, light base color. The more
+  // slices there are, the more of them sample the low-saturation gray zone
+  // near the seam, so long lists naturally read grayer at the edges.
   const triangle = posInCircle < 0.5 ? posInCircle * 2 : (1 - posInCircle) * 2;
-  const scaled = triangle * (stops.length - 1);
-  const lower = Math.floor(scaled);
-  const upper = Math.min(stops.length - 1, lower + 1);
-  const frac = scaled - lower;
-  return lerpHexColor(stops[lower], stops[upper], frac);
+  const lightness = 18 + triangle * 40; // 18% (dark) .. 58% (light)
+  const saturation = state.colorPalette === 'gray' ? 0 : 12 + triangle * 68; // 12% (grayish) .. 80% (vivid)
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 // --- i18n (basic, Spanish only for now, structure ready for more languages) ---
@@ -223,15 +206,15 @@ function removeParticipantAt(index) {
   drawWheel();
 }
 
-// Twitch chat join: one entry per person, plus their sub bonus extras (Tier 1)
-// applied immediately if the bonus is enabled and Twitch reports them as a subscriber.
-function addParticipant(username, isSub) {
+// Twitch chat join: one entry per person, plus their sub bonus extras applied
+// immediately for the tier Twitch reports in their subscriber badge.
+function addParticipant(username, subTier) {
   if (!username) return;
   if (state.participants.includes(username)) return;
   const settings = getSettings();
   let copies = 1;
-  if (settings.subBonusEnabled && isSub) {
-    copies += settings.subExtra[1] || 0;
+  if (settings.subBonusEnabled && subTier > 0) {
+    copies += settings.subExtra[subTier] || 0;
   }
   for (let i = 0; i < copies; i += 1) {
     state.participants.push(username);
@@ -582,7 +565,7 @@ window.htz.onStatus((status) => {
 });
 
 window.htz.onParticipant((payload) => {
-  addParticipant(payload.username, payload.isSub);
+  addParticipant(payload.username, payload.subTier);
 });
 
 els.spinBtn.addEventListener('click', spin);
