@@ -77,6 +77,8 @@
   "twitchClientIdLabel": "Client ID de Twitch",
   "twitchClientSecretLabel": "Client Secret de Twitch",
   "twitchCredsNote": "Se guardan solo en este dispositivo, nunca se suben al repositorio.",
+  "subsOnlyLabel": "Solo suscriptores",
+  "wheelScaleLabel": "Escala de la ruleta",
   "newThemeTitle": "Crear tema nuevo",
   "newThemeNamePlaceholder": "Nombre del tema",
   "newThemeBgLabel": "Imágenes de fondo",

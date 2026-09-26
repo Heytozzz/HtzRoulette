@@ -37,10 +37,11 @@ const els = {
   joinStatusText: document.getElementById('joinStatusText'),
   participantList: document.getElementById('participantList'),
   wheelCanvas: document.getElementById('wheelCanvas'),
-  spinBtn: document.getElementById('spinBtn'),
+  wheelBox: document.getElementById('wheelBox'),
   resetBtn: document.getElementById('resetBtn'),
   winnerText: document.getElementById('winnerText'),
   modeStatus: document.getElementById('modeStatus'),
+  subsOnlyCheckbox: document.getElementById('subsOnlyCheckbox'),
 
   spinDurationInput: document.getElementById('spinDurationInput'),
   modeSelect: document.getElementById('modeSelect'),
@@ -77,6 +78,7 @@ const els = {
   appearanceModal: document.getElementById('appearanceModal'),
   closeAppearanceModal: document.getElementById('closeAppearanceModal'),
   colorPaletteSelect: document.getElementById('colorPaletteSelect'),
+  wheelScaleSlider: document.getElementById('wheelScaleSlider'),
   themeSelect: document.getElementById('themeSelect'),
   deleteThemeBtn: document.getElementById('deleteThemeBtn'),
   rouletteImageModeSelect: document.getElementById('rouletteImageModeSelect'),
@@ -185,6 +187,14 @@ function updateSettingsVisibility() {
 
 els.manualSubCheckbox.addEventListener('change', () => {
   els.manualSubTier.classList.toggle('hidden', !els.manualSubCheckbox.checked);
+});
+
+[els.eliminationArrowCount, els.eliminationFinalWinnersCount, els.winnersCountInput].forEach((el) => {
+  el.addEventListener('input', () => drawWheel());
+});
+
+els.wheelScaleSlider.addEventListener('input', () => {
+  document.documentElement.style.setProperty('--wheel-scale', els.wheelScaleSlider.value / 100);
 });
 
 // --- Participants list ---
@@ -581,7 +591,6 @@ function getSelectionForRotation(rotation, pointerCount) {
 function spin() {
   if (state.spinning || state.participants.length === 0) return;
   state.spinning = true;
-  els.spinBtn.disabled = true;
   els.winnerText.textContent = '';
 
   const settings = getSettings();
@@ -649,7 +658,6 @@ function onSpinComplete(selection, settings) {
 
   if (settings.mode === 'normal') {
     els.winnerText.textContent = t('winner', { name: names[0] });
-    els.spinBtn.disabled = false;
     return;
   }
 
@@ -663,7 +671,6 @@ function onSpinComplete(selection, settings) {
     const remainingUniqueNames = [...new Set(state.participants)];
     if (remainingUniqueNames.length <= settings.eliminationFinalWinnersCount) {
       state.spinning = true;
-      els.spinBtn.disabled = true;
       if (remainingUniqueNames.length === 1) {
         els.winnerText.textContent = t('finalWinner', { name: remainingUniqueNames[0] });
       } else if (remainingUniqueNames.length > 1) {
@@ -675,10 +682,8 @@ function onSpinComplete(selection, settings) {
     }
 
     if (settings.autoMode) {
-      els.spinBtn.disabled = true;
       scheduleAutoSpin(settings.autoWaitMs);
     } else {
-      els.spinBtn.disabled = false;
     }
     return;
   }
@@ -692,7 +697,6 @@ function onSpinComplete(selection, settings) {
       renderParticipants();
       renderLogs();
       els.winnerText.textContent = t('winnersLabel', { names: uniqueRoundNames.join(', ') });
-      els.spinBtn.disabled = false;
       return;
     }
 
@@ -707,15 +711,12 @@ function onSpinComplete(selection, settings) {
     const done = state.winnersLog.length >= settings.winnersCount || remainingUniqueNames === 0;
     if (done) {
       els.winnerText.textContent = t('finalWinnerTie', { names: state.winnersLog.join(', ') });
-      els.spinBtn.disabled = true;
       return;
     }
 
     if (settings.autoMode) {
-      els.spinBtn.disabled = true;
       scheduleAutoSpin(settings.autoWaitMs);
     } else {
-      els.spinBtn.disabled = false;
     }
   }
 }
@@ -727,7 +728,6 @@ function resetParticipants() {
   state.eliminatedLog = [];
   state.winnersLog = [];
   state.spinning = false;
-  els.spinBtn.disabled = false;
   els.winnerText.textContent = '';
   els.modeStatus.textContent = '';
   renderParticipants();
@@ -844,8 +844,10 @@ function connectTwitch(channel) {
         if (parsed.command === 'PRIVMSG') {
           if (!state.joinAccepted) return;
           if (parsed.message.trim().toLowerCase() === state.joinCommand) {
+            const subTier = getSubTierFromTags(parsed.tags);
+            if (els.subsOnlyCheckbox.checked && !(subTier > 0)) return;
             const username = parsed.tags['display-name'] || (parsed.prefix.split('!')[0]);
-            addParticipant(username, getSubTierFromTags(parsed.tags));
+            addParticipant(username, subTier);
           }
         }
       });
@@ -924,7 +926,7 @@ els.stopJoinBtn.addEventListener('click', () => {
   els.joinStatusText.textContent = t('joinStopped');
 });
 
-els.spinBtn.addEventListener('click', spin);
+els.wheelBox.addEventListener('click', spin);
 els.resetBtn.addEventListener('click', resetParticipants);
 
 els.manualAddBtn.addEventListener('click', () => {

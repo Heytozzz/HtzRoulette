@@ -24,6 +24,10 @@
       <button id="startJoinBtn" data-i18n="startJoinBtn">Aceptar ingresos</button>
       <button id="stopJoinBtn" data-i18n="stopJoinBtn" disabled>Detener ingresos</button>
       <span id="joinStatusText" data-i18n="joinStopped">Ingresos detenidos</span>
+      <label class="inline-label">
+        <input id="subsOnlyCheckbox" type="checkbox" />
+        <span data-i18n="subsOnlyLabel">Solo suscriptores</span>
+      </label>
     </div>
   </header>
 
@@ -55,13 +59,13 @@
         </div>
         <textarea id="importExportArea" rows="4" data-i18n-placeholder="importExportPlaceholder" placeholder="Un nombre por línea"></textarea>
       </div>
+
+      <button id="resetBtn" class="reset-btn" data-i18n="reset">Reiniciar lista</button>
     </section>
 
     <section class="wheel-section">
-      <canvas id="wheelCanvas" width="400" height="400"></canvas>
-      <div class="controls">
-        <button id="spinBtn" data-i18n="spin">Girar</button>
-        <button id="resetBtn" data-i18n="reset">Reiniciar lista</button>
+      <div id="wheelBox" class="wheel-box">
+        <canvas id="wheelCanvas" width="520" height="520"></canvas>
       </div>
       <div id="winnerText"></div>
       <div id="modeStatus"></div>
@@ -144,6 +148,8 @@
         <button id="closeAppearanceModal" class="close-btn" data-i18n="closeBtn">Cerrar</button>
       </div>
       <h3 data-i18n="rouletteSubcategory">Ruleta</h3>
+      <label data-i18n="wheelScaleLabel">Escala de la ruleta</label>
+      <input id="wheelScaleSlider" type="range" min="50" max="150" step="5" value="100" />
       <label data-i18n="colorPaletteLabel">Paleta de colores</label>
       <select id="colorPaletteSelect">
         <option value="red" data-i18n="presetRed">Rojo</option>
