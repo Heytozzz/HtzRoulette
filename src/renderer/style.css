@@ -7,11 +7,16 @@ body {
   margin: 0;
   background: #17181c;
   color: #f0f0f0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 header {
   padding: 16px;
   border-bottom: 1px solid #2a2b31;
+  background: rgba(23, 24, 28, 0.75);
 }
 
 h1 {
@@ -36,6 +41,11 @@ h3 {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.join-command-bar #joinStatusText {
+  font-size: 12px;
+  color: #b8b8c0;
 }
 
 input[type="text"],
@@ -83,6 +93,9 @@ main {
 .participants {
   flex: 0 0 220px;
   max-width: 220px;
+  background: rgba(23, 24, 28, 0.75);
+  padding: 8px;
+  border-radius: 6px;
 }
 
 .participants ul {
@@ -253,7 +266,7 @@ main {
 .settings {
   flex: 0 0 260px;
   max-width: 260px;
-  background: #1d1e24;
+  background: rgba(29, 30, 36, 0.85);
   padding: 12px;
   border-radius: 6px;
 }

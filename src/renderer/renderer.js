@@ -8,7 +8,15 @@ const state = {
   winnersLog: [],
   autoTimer: null,
   colorPalette: 'red',
+  joinAccepted: false,
+  themeImages: { bg: [], roulette: [] },
+  rouletteImageMode: 'colors',
+  playerImageMap: new Map(),
+  fullWheelImageUrl: null,
+  imageCache: new Map(),
 };
+
+const PLACEHOLDER_SLICE_COUNT = 8;
 
 const els = {
   channelInput: document.getElementById('channelInput'),
@@ -16,6 +24,9 @@ const els = {
   disconnectBtn: document.getElementById('disconnectBtn'),
   statusText: document.getElementById('statusText'),
   joinCommandInput: document.getElementById('joinCommandInput'),
+  startJoinBtn: document.getElementById('startJoinBtn'),
+  stopJoinBtn: document.getElementById('stopJoinBtn'),
+  joinStatusText: document.getElementById('joinStatusText'),
   participantList: document.getElementById('participantList'),
   wheelCanvas: document.getElementById('wheelCanvas'),
   spinBtn: document.getElementById('spinBtn'),
@@ -59,6 +70,8 @@ const els = {
   appearanceModal: document.getElementById('appearanceModal'),
   closeAppearanceModal: document.getElementById('closeAppearanceModal'),
   colorPaletteSelect: document.getElementById('colorPaletteSelect'),
+  themeSelect: document.getElementById('themeSelect'),
+  rouletteImageModeSelect: document.getElementById('rouletteImageModeSelect'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -263,6 +276,31 @@ function renderLogs() {
   });
 }
 
+// Loads (and caches) an image; returns it once ready, otherwise triggers a
+// redraw when it finishes loading and returns null for now.
+function getLoadedImage(url) {
+  if (!url) return null;
+  const cached = state.imageCache.get(url);
+  if (cached) return cached.complete && cached.naturalWidth > 0 ? cached : null;
+  const img = new Image();
+  img.onload = () => drawWheel();
+  img.src = url;
+  state.imageCache.set(url, img);
+  return null;
+}
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getPlayerImage(name) {
+  if (state.playerImageMap.has(name)) return state.playerImageMap.get(name);
+  const images = state.themeImages.roulette;
+  const url = images && images.length > 0 ? pickRandom(images) : null;
+  state.playerImageMap.set(name, url);
+  return url;
+}
+
 // --- Wheel drawing ---
 function drawWheel() {
   const { width, height } = els.wheelCanvas;
@@ -273,21 +311,35 @@ function drawWheel() {
   ctx.clearRect(0, 0, width, height);
 
   const count = state.participants.length;
+
+  // Nothing added yet: show a nice-looking placeholder wheel instead of a
+  // flat empty circle.
   if (count === 0) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#2a2b31';
-    ctx.fill();
+    drawColorSlices(cx, cy, radius, PLACEHOLDER_SLICE_COUNT, []);
+    drawPointers(cx, cy, radius);
     return;
   }
 
+  const mode = state.rouletteImageMode;
+  if (mode === 'full-wheel' && state.fullWheelImageUrl) {
+    drawFullWheelImage(cx, cy, radius, count);
+  } else if (mode === 'per-player') {
+    drawPerPlayerImages(cx, cy, radius, count);
+  } else {
+    drawColorSlices(cx, cy, radius, count, state.participants);
+  }
+
+  drawPointers(cx, cy, radius);
+}
+
+function drawColorSlices(cx, cy, radius, count, names) {
   const sliceAngle = (Math.PI * 2) / count;
 
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(state.rotation);
 
-  state.participants.forEach((name, i) => {
+  for (let i = 0; i < count; i += 1) {
     const start = i * sliceAngle;
     const end = start + sliceAngle;
 
@@ -298,18 +350,111 @@ function drawWheel() {
     ctx.fillStyle = getSliceColor(i, count);
     ctx.fill();
 
-    ctx.save();
-    ctx.rotate(start + sliceAngle / 2);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#fff';
-    ctx.font = '14px Segoe UI';
-    ctx.fillText(name, radius - 10, 4);
-    ctx.restore();
-  });
+    if (names[i]) {
+      ctx.save();
+      ctx.rotate(start + sliceAngle / 2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#fff';
+      ctx.font = '14px Segoe UI';
+      ctx.fillText(names[i], radius - 10, 4);
+      ctx.restore();
+    }
+  }
 
   ctx.restore();
+}
 
-  // Pointer(s): drawn pointing INWARD at the rim, evenly spaced around the wheel
+function drawPerPlayerImages(cx, cy, radius, count) {
+  const sliceAngle = (Math.PI * 2) / count;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(state.rotation);
+
+  for (let i = 0; i < count; i += 1) {
+    const start = i * sliceAngle;
+    const end = start + sliceAngle;
+    const name = state.participants[i];
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, radius, start, end);
+    ctx.closePath();
+    ctx.fillStyle = '#20212a';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    const imageUrl = getPlayerImage(name);
+    const img = getLoadedImage(imageUrl);
+
+    ctx.save();
+    ctx.rotate(start + sliceAngle / 2);
+
+    if (img) {
+      const avatarRadius = Math.min(radius * 0.28, (sliceAngle * radius) / 2.2);
+      const avatarCx = radius * 0.62;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(avatarCx, 0, avatarRadius, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, avatarCx - avatarRadius, -avatarRadius, avatarRadius * 2, avatarRadius * 2);
+      ctx.restore();
+    }
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fff';
+    ctx.font = '13px Segoe UI';
+    ctx.fillText(name, radius - 8, radius * 0.25);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawFullWheelImage(cx, cy, radius, count) {
+  const img = getLoadedImage(state.fullWheelImageUrl);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(state.rotation);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.closePath();
+
+  if (img) {
+    ctx.save();
+    ctx.clip();
+    ctx.drawImage(img, -radius, -radius, radius * 2, radius * 2);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#20212a';
+    ctx.fill();
+  }
+
+  // Black division lines between slots
+  const sliceAngle = (Math.PI * 2) / count;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < count; i += 1) {
+    const angle = i * sliceAngle;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(radius * Math.cos(angle), radius * Math.sin(angle));
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawPointers(cx, cy, radius) {
   const pointerCount = pointerCountForCurrentSettings();
   const pointerAngles = getPointerAngles(pointerCount);
   pointerAngles.forEach((angle) => {
@@ -565,6 +710,7 @@ window.htz.onStatus((status) => {
 });
 
 window.htz.onParticipant((payload) => {
+  if (!state.joinAccepted) return;
   addParticipant(payload.username, payload.subTier);
 });
 
@@ -603,6 +749,67 @@ els.colorPaletteSelect.addEventListener('change', () => {
   drawWheel();
 });
 
+els.startJoinBtn.addEventListener('click', () => {
+  state.joinAccepted = true;
+  els.startJoinBtn.disabled = true;
+  els.stopJoinBtn.disabled = false;
+  els.joinStatusText.textContent = t('joinOpen');
+});
+
+els.stopJoinBtn.addEventListener('click', () => {
+  state.joinAccepted = false;
+  els.startJoinBtn.disabled = false;
+  els.stopJoinBtn.disabled = true;
+  els.joinStatusText.textContent = t('joinStopped');
+});
+
+async function loadThemeList() {
+  const themes = await window.htz.listThemes();
+  els.themeSelect.innerHTML = `<option value="">${t('themeNone')}</option>`;
+  themes.forEach((name) => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    els.themeSelect.appendChild(option);
+  });
+}
+
+async function applyTheme(themeName) {
+  state.playerImageMap.clear();
+  state.fullWheelImageUrl = null;
+
+  if (!themeName) {
+    state.themeImages = { bg: [], roulette: [] };
+    document.body.style.backgroundImage = '';
+    drawWheel();
+    return;
+  }
+
+  const images = await window.htz.getThemeImages(themeName);
+  state.themeImages = images;
+
+  if (images.bg && images.bg.length > 0) {
+    document.body.style.backgroundImage = `url("${pickRandom(images.bg)}")`;
+  } else {
+    document.body.style.backgroundImage = '';
+  }
+
+  if (images.roulette && images.roulette.length > 0) {
+    state.fullWheelImageUrl = pickRandom(images.roulette);
+  }
+
+  drawWheel();
+}
+
+els.themeSelect.addEventListener('change', () => {
+  applyTheme(els.themeSelect.value);
+});
+
+els.rouletteImageModeSelect.addEventListener('change', () => {
+  state.rouletteImageMode = els.rouletteImageModeSelect.value;
+  drawWheel();
+});
+
 els.exportBtn.addEventListener('click', async () => {
   const text = state.participants.join('\n');
   els.importExportArea.value = text;
@@ -626,6 +833,7 @@ els.importBtn.addEventListener('click', () => {
 // --- Init ---
 loadStrings().then(() => {
   els.colorPaletteSelect.value = state.colorPalette;
+  loadThemeList();
   renderParticipants();
   renderLogs();
   updateSettingsVisibility();

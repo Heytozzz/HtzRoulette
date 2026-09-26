@@ -1,11 +1,36 @@
 // Main process: creates the app window and manages the Twitch chat connection
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { pathToFileURL } = require('url');
 const tmi = require('tmi.js');
 
 let mainWindow = null;
 let tmiClient = null;
 let joinCommand = '!join';
+
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+
+// Resolve the folder the app "lives in" so themes/ can sit next to the portable
+// exe. electron-builder's portable target extracts to a temp folder on each
+// run, but sets PORTABLE_EXECUTABLE_DIR to the real folder the user double-clicked.
+function getAppBaseDir() {
+  if (process.env.PORTABLE_EXECUTABLE_DIR) return process.env.PORTABLE_EXECUTABLE_DIR;
+  if (app.isPackaged) return path.dirname(process.execPath);
+  return path.join(__dirname, '..'); // project root during development
+}
+
+function getThemesDir() {
+  return path.join(getAppBaseDir(), 'themes');
+}
+
+function listImageFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && IMAGE_EXTENSIONS.includes(path.extname(entry.name).toLowerCase()))
+    .map((entry) => pathToFileURL(path.join(dir, entry.name)).toString());
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -96,4 +121,25 @@ ipcMain.handle('twitch:disconnect', async () => {
 ipcMain.handle('twitch:setJoinCommand', (event, command) => {
   joinCommand = String(command).trim().toLowerCase() || '!join';
   return { ok: true, command: joinCommand };
+});
+
+// List theme folder names under themes/ (each theme has bg/ and roulette/ subfolders)
+ipcMain.handle('themes:list', () => {
+  const themesDir = getThemesDir();
+  if (!fs.existsSync(themesDir)) return [];
+  return fs
+    .readdirSync(themesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+});
+
+// Return file:// URLs for a theme's background and roulette images
+ipcMain.handle('themes:getImages', (event, themeName) => {
+  const themesDir = getThemesDir();
+  const safeName = path.basename(themeName || '');
+  const themeDir = path.join(themesDir, safeName);
+  return {
+    bg: listImageFiles(path.join(themeDir, 'bg')),
+    roulette: listImageFiles(path.join(themeDir, 'roulette')),
+  };
 });

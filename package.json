@@ -25,6 +25,12 @@
     "files": [
       "src/**/*"
     ],
+    "extraFiles": [
+      {
+        "from": "themes",
+        "to": "themes"
+      }
+    ],
     "win": {
       "target": "portable"
     },

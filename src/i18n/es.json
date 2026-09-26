@@ -60,5 +60,16 @@
   "presetGreen": "Verde",
   "presetPurple": "Morado",
   "presetGray": "Gris",
-  "presetRainbow": "Arcoíris"
+  "presetRainbow": "Arcoíris",
+  "startJoinBtn": "Aceptar ingresos",
+  "stopJoinBtn": "Detener ingresos",
+  "joinStopped": "Ingresos detenidos",
+  "joinOpen": "Ingresos abiertos",
+  "themesSubcategory": "Temas",
+  "themeLabel": "Carpeta de tema",
+  "themeNone": "Ninguno (colores)",
+  "rouletteImageModeLabel": "Modo de imagen de la ruleta",
+  "rouletteModeColors": "Colores",
+  "rouletteModePerPlayer": "Imagen por jugador",
+  "rouletteModeFullWheel": "Imagen completa"
 }

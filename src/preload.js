@@ -11,4 +11,6 @@ contextBridge.exposeInMainWorld('htz', {
   onStatus: (callback) => {
     ipcRenderer.on('twitch:status', (event, status) => callback(status));
   },
+  listThemes: () => ipcRenderer.invoke('themes:list'),
+  getThemeImages: (themeName) => ipcRenderer.invoke('themes:getImages', themeName),
 });

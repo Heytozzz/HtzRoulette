@@ -21,6 +21,9 @@
     <div class="join-command-bar">
       <label data-i18n="joinCommandLabel">Comando para unirse</label>
       <input id="joinCommandInput" type="text" value="!join" />
+      <button id="startJoinBtn" data-i18n="startJoinBtn">Aceptar ingresos</button>
+      <button id="stopJoinBtn" data-i18n="stopJoinBtn" disabled>Detener ingresos</button>
+      <span id="joinStatusText" data-i18n="joinStopped">Ingresos detenidos</span>
     </div>
   </header>
 
@@ -149,6 +152,19 @@
         <option value="purple" data-i18n="presetPurple">Morado</option>
         <option value="gray" data-i18n="presetGray">Gris</option>
         <option value="rainbow" data-i18n="presetRainbow">Arcoíris</option>
+      </select>
+
+      <h3 data-i18n="themesSubcategory">Temas</h3>
+      <label data-i18n="themeLabel">Carpeta de tema</label>
+      <select id="themeSelect">
+        <option value="" data-i18n="themeNone">Ninguno (colores)</option>
+      </select>
+
+      <label data-i18n="rouletteImageModeLabel">Modo de imagen de la ruleta</label>
+      <select id="rouletteImageModeSelect">
+        <option value="colors" data-i18n="rouletteModeColors">Colores</option>
+        <option value="per-player" data-i18n="rouletteModePerPlayer">Imagen por jugador</option>
+        <option value="full-wheel" data-i18n="rouletteModeFullWheel">Imagen completa</option>
       </select>
     </div>
   </div>
