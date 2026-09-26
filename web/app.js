@@ -1,5 +1,6 @@
-// Web app: runs entirely in the browser. tmi.js connects straight to Twitch's
-// chat over WebSocket (no server/backend needed), and themes/images are
+// Web app: runs entirely in the browser. Talks to Twitch chat directly over
+// a WebSocket using Twitch's IRC protocol (no server/backend, no tmi.js
+// dependency — its browser CDN bundle is unreliable). Themes/images are
 // stored in this browser's IndexedDB (there's no filesystem to read from).
 
 const state = {
@@ -17,7 +18,7 @@ const state = {
   playerImageMap: new Map(),
   fullWheelImageUrl: null,
   imageCache: new Map(),
-  tmiClient: null,
+  twitchSocket: null,
 };
 
 const PLACEHOLDER_SLICE_COUNT = 8;
@@ -639,13 +640,69 @@ function resetParticipants() {
   drawWheel();
 }
 
-// --- Twitch connection (tmi.js talks straight to Twitch over WebSocket) ---
+// --- Twitch connection ---
+// tmi.js has no reliable browser CDN bundle (its official CDN has been down
+// for a long time and the npm package doesn't ship one), so the web version
+// speaks Twitch's chat IRC protocol directly over WebSocket instead. This is
+// a small, well-documented protocol for anonymous read-only access.
 
-// Same badge-version convention as the desktop app: 4+ digit versions are
-// prefixed with the tier ("3018" = Tier 3, 18-month badge); shorter values
-// ("0".."120") are plain Tier 1 month milestones.
-function getSubTier(tags) {
-  const badgeVersion = tags.badges && tags.badges.subscriber;
+// Unescape IRCv3 tag values: \s -> space, \: -> ;, \\ -> \, \r -> CR, \n -> LF
+function unescapeIrcTagValue(value) {
+  if (!value) return value;
+  return value.replace(/\\(.)/g, (match, ch) => {
+    if (ch === 's') return ' ';
+    if (ch === ':') return ';';
+    if (ch === 'r') return '\r';
+    if (ch === 'n') return '\n';
+    return ch; // \\ -> \
+  });
+}
+
+function parseIrcLine(line) {
+  let rest = line;
+  const tags = {};
+
+  if (rest.startsWith('@')) {
+    const spaceIdx = rest.indexOf(' ');
+    const tagStr = rest.slice(1, spaceIdx);
+    rest = rest.slice(spaceIdx + 1);
+    tagStr.split(';').forEach((pair) => {
+      const eqIdx = pair.indexOf('=');
+      const key = eqIdx === -1 ? pair : pair.slice(0, eqIdx);
+      const value = eqIdx === -1 ? '' : unescapeIrcTagValue(pair.slice(eqIdx + 1));
+      tags[key] = value;
+    });
+  }
+
+  let prefix = '';
+  if (rest.startsWith(':')) {
+    const spaceIdx = rest.indexOf(' ');
+    prefix = rest.slice(1, spaceIdx);
+    rest = rest.slice(spaceIdx + 1);
+  }
+
+  const trailingIdx = rest.indexOf(' :');
+  const paramsPart = trailingIdx === -1 ? rest : rest.slice(0, trailingIdx);
+  const trailing = trailingIdx === -1 ? '' : rest.slice(trailingIdx + 2);
+  const paramTokens = paramsPart.trim().split(' ').filter(Boolean);
+  const command = paramTokens[0] || '';
+  const channel = paramTokens[1] || '';
+
+  return { tags, prefix, command, channel, message: trailing };
+}
+
+// Badge version convention: 4+ digit versions are prefixed with the tier
+// ("3018" = Tier 3, 18-month badge); shorter values ("0".."120") are plain
+// Tier 1 month milestones.
+function getSubTierFromTags(tags) {
+  const badgesStr = tags.badges || '';
+  if (!badgesStr) return 0;
+  const badgeMap = {};
+  badgesStr.split(',').forEach((entry) => {
+    const [name, version] = entry.split('/');
+    badgeMap[name] = version;
+  });
+  const badgeVersion = badgeMap.subscriber;
   if (!badgeVersion) return 0;
   if (badgeVersion.length >= 4) {
     if (badgeVersion.startsWith('3')) return 3;
@@ -654,60 +711,100 @@ function getSubTier(tags) {
   return 1;
 }
 
-async function connectTwitch(channel) {
-  if (state.tmiClient) {
-    try {
-      await state.tmiClient.disconnect();
-    } catch (err) {
-      // ignore
-    }
-    state.tmiClient = null;
-  }
+function connectTwitch(channel) {
+  return new Promise((resolve) => {
+    const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+    const nick = 'justinfan' + Math.floor(10000 + Math.random() * 90000);
+    let settled = false;
 
-  const client = new window.tmi.Client({ channels: [channel] });
+    ws.onopen = () => {
+      ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+      ws.send('PASS SCHMOOPIIE');
+      ws.send(`NICK ${nick}`);
+      ws.send(`JOIN #${channel}`);
+    };
 
-  client.on('message', (chan, tags, message, self) => {
-    if (self || !state.joinAccepted) return;
-    if (message.trim().toLowerCase() === state.joinCommand) {
-      const username = tags['display-name'] || tags.username;
-      addParticipant(username, getSubTier(tags));
-    }
+    ws.onmessage = (event) => {
+      const lines = event.data.split('\r\n').filter(Boolean);
+      lines.forEach((line) => {
+        if (line.startsWith('PING')) {
+          ws.send('PONG :tmi.twitch.tv');
+          return;
+        }
+
+        const parsed = parseIrcLine(line);
+
+        if (parsed.command === '001' || parsed.command === 'JOIN') {
+          if (!settled) {
+            settled = true;
+            resolve({ ok: true, ws });
+          }
+        }
+
+        if (parsed.command === 'NOTICE' && !settled) {
+          settled = true;
+          resolve({ ok: false, error: parsed.message || 'connection refused' });
+        }
+
+        if (parsed.command === 'PRIVMSG') {
+          if (!state.joinAccepted) return;
+          if (parsed.message.trim().toLowerCase() === state.joinCommand) {
+            const username = parsed.tags['display-name'] || (parsed.prefix.split('!')[0]);
+            addParticipant(username, getSubTierFromTags(parsed.tags));
+          }
+        }
+      });
+    };
+
+    ws.onerror = () => {
+      if (!settled) {
+        settled = true;
+        resolve({ ok: false, error: 'websocket-error' });
+      }
+    };
+
+    ws.onclose = () => {
+      state.twitchSocket = null;
+      els.statusText.textContent = t('statusDisconnected');
+      els.connectBtn.disabled = false;
+      els.disconnectBtn.disabled = true;
+      if (!settled) {
+        settled = true;
+        resolve({ ok: false, error: 'closed-before-join' });
+      }
+    };
+
+    // Twitch should confirm the JOIN almost immediately; give up after 8s
+    setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve({ ok: false, error: 'timeout' });
+      }
+    }, 8000);
   });
-
-  client.on('disconnected', () => {
-    els.statusText.textContent = t('statusDisconnected');
-    els.connectBtn.disabled = false;
-    els.disconnectBtn.disabled = true;
-  });
-
-  state.tmiClient = client;
-
-  try {
-    await client.connect();
-    els.statusText.textContent = t('statusConnected', { channel });
-    els.disconnectBtn.disabled = false;
-  } catch (err) {
-    els.statusText.textContent = 'Error: ' + err;
-    els.connectBtn.disabled = false;
-    state.tmiClient = null;
-  }
 }
 
 els.connectBtn.addEventListener('click', async () => {
   const channel = els.channelInput.value.trim().replace(/^#/, '').toLowerCase();
   if (!channel) return;
   els.connectBtn.disabled = true;
-  await connectTwitch(channel);
+  els.statusText.textContent = '…';
+
+  const result = await connectTwitch(channel);
+  if (result.ok) {
+    state.twitchSocket = result.ws;
+    els.statusText.textContent = t('statusConnected', { channel });
+    els.disconnectBtn.disabled = false;
+  } else {
+    els.statusText.textContent = 'Error: ' + result.error;
+    els.connectBtn.disabled = false;
+  }
 });
 
-els.disconnectBtn.addEventListener('click', async () => {
-  if (state.tmiClient) {
-    try {
-      await state.tmiClient.disconnect();
-    } catch (err) {
-      // ignore
-    }
-    state.tmiClient = null;
+els.disconnectBtn.addEventListener('click', () => {
+  if (state.twitchSocket) {
+    state.twitchSocket.close();
+    state.twitchSocket = null;
   }
   els.statusText.textContent = t('statusDisconnected');
   els.connectBtn.disabled = false;
