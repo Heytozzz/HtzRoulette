@@ -32,6 +32,16 @@ Formatos soportados: png, jpg, jpeg, gif, webp.
 
 Selecciona el tema y el modo de imagen de la ruleta desde el botón de engranaje (⚙) → Aspecto.
 
+## Versión web (sin descargar nada)
+
+Además del `.exe` de escritorio, el repo incluye una versión 100% web en la carpeta `web/` — corre en cualquier navegador, sin instalar nada, y se conecta al chat de Twitch directo desde el navegador (usando `tmi.js` vía WebSocket).
+
+**Configuración única (una sola vez):** en GitHub, ve a `Settings` → `Pages` → en "Build and deployment" → "Source" elige **GitHub Actions**. Después de eso, cada push a `main` que toque la carpeta `web/` la publica automáticamente en `https://heytozzz.github.io/HtzRoulette/`.
+
+Diferencias con la versión de escritorio:
+- No hay carpeta `themes/` en disco: los temas (fondo + imágenes de la ruleta) se crean y se guardan directamente desde la app, en el propio navegador (IndexedDB). No se suben a ningún servidor y solo están disponibles en ese navegador/dispositivo.
+- Todo lo demás (modos de ruleta, sub bonus, exportar/importar, paletas, aceptar/detener ingresos) funciona igual que en la app de escritorio.
+
 ## Descargar la app
 
 No hace falta instalar Node.js ni Electron en tu PC. Cada vez que se sube un cambio a la rama `main`, GitHub Actions compila automáticamente un `.exe` portable para Windows.
