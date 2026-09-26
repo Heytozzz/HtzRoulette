@@ -14,6 +14,9 @@ const state = {
   playerImageMap: new Map(),
   fullWheelImageUrl: null,
   imageCache: new Map(),
+  profilePhotoMap: new Map(),
+  twitchApiToken: null,
+  twitchApiTokenClientId: null,
 };
 
 const PLACEHOLDER_SLICE_COUNT = 8;
@@ -72,6 +75,8 @@ const els = {
   colorPaletteSelect: document.getElementById('colorPaletteSelect'),
   themeSelect: document.getElementById('themeSelect'),
   rouletteImageModeSelect: document.getElementById('rouletteImageModeSelect'),
+  twitchClientId: document.getElementById('twitchClientId'),
+  twitchClientSecret: document.getElementById('twitchClientSecret'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -301,6 +306,94 @@ function getPlayerImage(name) {
   return url;
 }
 
+// --- Twitch profile photos (Helix API) ---
+// Uses the app's own Client ID/Secret (entered by the user, stored only in
+// this device's localStorage) to fetch real Twitch avatars. Only resolves
+// for names that match an actual Twitch login exactly (case-insensitive) —
+// localized display names that differ from the login won't match.
+const TWITCH_TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
+const TWITCH_USERS_URL = 'https://api.twitch.tv/helix/users';
+
+async function getTwitchAppToken(clientId, clientSecret) {
+  if (state.twitchApiToken && state.twitchApiTokenClientId === clientId) {
+    return state.twitchApiToken;
+  }
+  const params = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'client_credentials',
+  });
+  const res = await fetch(`${TWITCH_TOKEN_URL}?${params.toString()}`, { method: 'POST' });
+  if (!res.ok) throw new Error('twitch-token-request-failed');
+  const data = await res.json();
+  state.twitchApiToken = data.access_token;
+  state.twitchApiTokenClientId = clientId;
+  return state.twitchApiToken;
+}
+
+let profilePhotoFetchInFlight = false;
+
+async function fetchProfilePhotos(names) {
+  if (profilePhotoFetchInFlight) return;
+  const clientId = els.twitchClientId.value.trim();
+  const clientSecret = els.twitchClientSecret.value.trim();
+  if (!clientId || !clientSecret) return;
+
+  const logins = [...new Set(names.map((n) => n.toLowerCase()))].filter(
+    (n) => !state.profilePhotoMap.has(n)
+  );
+  if (logins.length === 0) return;
+
+  profilePhotoFetchInFlight = true;
+  try {
+    const token = await getTwitchAppToken(clientId, clientSecret);
+    for (let i = 0; i < logins.length; i += 100) {
+      const chunk = logins.slice(i, i + 100);
+      const params = chunk.map((login) => `login=${encodeURIComponent(login)}`).join('&');
+      const res = await fetch(`${TWITCH_USERS_URL}?${params}`, {
+        headers: { 'Client-Id': clientId, Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('twitch-users-request-failed');
+      const data = await res.json();
+      (data.data || []).forEach((u) => {
+        state.profilePhotoMap.set(u.login, u.profile_image_url);
+      });
+      chunk.forEach((login) => {
+        if (!state.profilePhotoMap.has(login)) state.profilePhotoMap.set(login, null);
+      });
+    }
+    drawWheel();
+  } catch (err) {
+    console.error('Twitch profile photo fetch failed:', err);
+  } finally {
+    profilePhotoFetchInFlight = false;
+  }
+}
+
+function getProfilePhotoImage(name) {
+  const key = name.toLowerCase();
+  if (!state.profilePhotoMap.has(key)) {
+    fetchProfilePhotos([...new Set(state.participants)]);
+    return null;
+  }
+  return state.profilePhotoMap.get(key);
+}
+
+function loadTwitchCredentials() {
+  els.twitchClientId.value = localStorage.getItem('htz_twitch_client_id') || '';
+  els.twitchClientSecret.value = localStorage.getItem('htz_twitch_client_secret') || '';
+}
+
+els.twitchClientId.addEventListener('change', () => {
+  localStorage.setItem('htz_twitch_client_id', els.twitchClientId.value.trim());
+  state.twitchApiToken = null;
+});
+
+els.twitchClientSecret.addEventListener('change', () => {
+  localStorage.setItem('htz_twitch_client_secret', els.twitchClientSecret.value.trim());
+  state.twitchApiToken = null;
+});
+
 // --- Wheel drawing ---
 function drawWheel() {
   const { width, height } = els.wheelCanvas;
@@ -324,7 +417,9 @@ function drawWheel() {
   if (mode === 'full-wheel' && state.fullWheelImageUrl) {
     drawFullWheelImage(cx, cy, radius, count);
   } else if (mode === 'per-player') {
-    drawPerPlayerImages(cx, cy, radius, count);
+    drawAvatarSlices(cx, cy, radius, count, getPlayerImage);
+  } else if (mode === 'profile-photos') {
+    drawAvatarSlices(cx, cy, radius, count, getProfilePhotoImage);
   } else {
     drawColorSlices(cx, cy, radius, count, state.participants);
   }
@@ -364,7 +459,7 @@ function drawColorSlices(cx, cy, radius, count, names) {
   ctx.restore();
 }
 
-function drawPerPlayerImages(cx, cy, radius, count) {
+function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
   const sliceAngle = (Math.PI * 2) / count;
 
   ctx.save();
@@ -386,7 +481,7 @@ function drawPerPlayerImages(cx, cy, radius, count) {
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 
-    const imageUrl = getPlayerImage(name);
+    const imageUrl = getImageForName(name);
     const img = getLoadedImage(imageUrl);
 
     ctx.save();
@@ -833,6 +928,7 @@ els.importBtn.addEventListener('click', () => {
 // --- Init ---
 loadStrings().then(() => {
   els.colorPaletteSelect.value = state.colorPalette;
+  loadTwitchCredentials();
   loadThemeList();
   renderParticipants();
   renderLogs();

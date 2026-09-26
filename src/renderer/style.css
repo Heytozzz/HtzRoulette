@@ -213,6 +213,12 @@ main {
   width: 100%;
 }
 
+.modal-note {
+  font-size: 11px;
+  color: #7a7b82;
+  margin-top: 10px;
+}
+
 .import-export {
   margin-top: 8px;
   display: flex;

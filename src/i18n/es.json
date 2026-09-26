@@ -71,5 +71,10 @@
   "rouletteImageModeLabel": "Modo de imagen de la ruleta",
   "rouletteModeColors": "Colores",
   "rouletteModePerPlayer": "Imagen por jugador",
-  "rouletteModeFullWheel": "Imagen completa"
+  "rouletteModeFullWheel": "Imagen completa",
+  "rouletteModeProfilePhotos": "Fotos de perfil",
+  "profilePhotoSubcategory": "Fotos de perfil (API de Twitch)",
+  "twitchClientIdLabel": "Client ID de Twitch",
+  "twitchClientSecretLabel": "Client Secret de Twitch",
+  "twitchCredsNote": "Se guardan solo en este dispositivo, nunca se suben al repositorio."
 }
