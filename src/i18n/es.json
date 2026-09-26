@@ -78,5 +78,9 @@
   "twitchClientSecretLabel": "Client Secret de Twitch",
   "twitchCredsNote": "Se guardan solo en este dispositivo, nunca se suben al repositorio.",
   "subsOnlyLabel": "Solo suscriptores",
-  "wheelScaleLabel": "Escala de la ruleta"
+  "wheelScaleLabel": "Escala de la ruleta",
+  "duplicateTitle": "Duplicar (dar cupo extra)",
+  "debugSubcategory": "Debug",
+  "debugModeLabel": "Modo debug (temporal, arrastra cajas/botones)",
+  "debugModeNote": "No se guarda: al recargar la app vuelve al orden normal."
 }

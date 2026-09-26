@@ -79,6 +79,7 @@ const els = {
   rouletteImageModeSelect: document.getElementById('rouletteImageModeSelect'),
   twitchClientId: document.getElementById('twitchClientId'),
   twitchClientSecret: document.getElementById('twitchClientSecret'),
+  debugModeCheckbox: document.getElementById('debugModeCheckbox'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -208,6 +209,7 @@ function renderParticipants() {
     const li = document.createElement('li');
     li.textContent = t('empty');
     els.participantList.appendChild(li);
+    saveState();
     return;
   }
   state.participants.forEach((name, index) => {
@@ -224,8 +226,23 @@ function renderParticipants() {
     removeBtn.addEventListener('click', () => removeParticipantAt(index));
     li.appendChild(removeBtn);
 
+    const dupBtn = document.createElement('button');
+    dupBtn.className = 'dup-btn';
+    dupBtn.textContent = '+';
+    dupBtn.title = t('duplicateTitle');
+    dupBtn.addEventListener('click', () => duplicateParticipantAt(index));
+    li.appendChild(dupBtn);
+
     els.participantList.appendChild(li);
   });
+  saveState();
+}
+
+function duplicateParticipantAt(index) {
+  const name = state.participants[index];
+  state.participants.splice(index + 1, 0, name);
+  renderParticipants();
+  drawWheel();
 }
 
 function removeParticipantAt(index) {
@@ -640,6 +657,7 @@ function spin() {
 
   const duration = settings.spinDurationMs;
   const startTime = performance.now();
+  let lastBoundaryIndex = null;
 
   function spinEasing(x) {
     // Fast ramp-up in the first 10% of the animation, then a long ease-out slowdown
@@ -660,9 +678,16 @@ function spin() {
     state.rotation = startRotation + (targetRotation - startRotation) * eased;
     drawWheel();
 
+    const boundaryIndex = Math.floor(normalizeAngle(-state.rotation) / sliceAngle);
+    if (lastBoundaryIndex !== null && boundaryIndex !== lastBoundaryIndex) {
+      playTickSound();
+    }
+    lastBoundaryIndex = boundaryIndex;
+
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
+      playLandingSound();
       onSpinComplete(getSelectionForRotation(state.rotation, pointerCount), settings);
     }
   }
@@ -926,11 +951,205 @@ els.importBtn.addEventListener('click', () => {
   drawWheel();
 });
 
+// --- Sound effects (procedurally generated, no audio files needed) ---
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTickSound() {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 900;
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.05);
+  } catch (err) {
+    // Audio may be unavailable/blocked; fail silently
+  }
+}
+
+function playLandingSound() {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(420, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.35);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.45);
+  } catch (err) {
+    // Audio may be unavailable/blocked; fail silently
+  }
+}
+
+// --- Persist settings + participants across app restarts ---
+const SAVED_STATE_KEY = 'htz_saved_state';
+
+function saveState() {
+  try {
+    const data = {
+      participants: state.participants,
+      eliminatedLog: state.eliminatedLog,
+      winnersLog: state.winnersLog,
+      spinDuration: els.spinDurationInput.value,
+      mode: els.modeSelect.value,
+      eliminationSubMode: els.eliminationSubMode.value,
+      eliminationArrowCount: els.eliminationArrowCount.value,
+      eliminationFinalWinnersCount: els.eliminationFinalWinnersCount.value,
+      winnersSubMode: els.winnersSubMode.value,
+      winnersCount: els.winnersCountInput.value,
+      autoMode: els.autoModeCheckbox.checked,
+      autoWait: els.autoWaitInput.value,
+      subBonusEnabled: els.subBonusCheckbox.checked,
+      subExtraTier1: els.subExtraTier1.value,
+      subExtraTier2: els.subExtraTier2.value,
+      subExtraTier3: els.subExtraTier3.value,
+      colorPalette: state.colorPalette,
+      wheelScale: els.wheelScaleSlider.value,
+      theme: els.themeSelect.value,
+      rouletteImageMode: state.rouletteImageMode,
+      joinCommand: els.joinCommandInput.value,
+      subsOnly: els.subsOnlyCheckbox.checked,
+    };
+    localStorage.setItem(SAVED_STATE_KEY, JSON.stringify(data));
+  } catch (err) {
+    // Storage may be unavailable; ignore
+  }
+}
+
+function loadSavedState() {
+  try {
+    const raw = localStorage.getItem(SAVED_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function applySavedState() {
+  const data = loadSavedState();
+  if (!data) return;
+
+  state.participants = Array.isArray(data.participants) ? data.participants : [];
+  state.eliminatedLog = Array.isArray(data.eliminatedLog) ? data.eliminatedLog : [];
+  state.winnersLog = Array.isArray(data.winnersLog) ? data.winnersLog : [];
+
+  if (data.spinDuration != null) els.spinDurationInput.value = data.spinDuration;
+  if (data.mode != null) els.modeSelect.value = data.mode;
+  if (data.eliminationSubMode != null) els.eliminationSubMode.value = data.eliminationSubMode;
+  if (data.eliminationArrowCount != null) els.eliminationArrowCount.value = data.eliminationArrowCount;
+  if (data.eliminationFinalWinnersCount != null) {
+    els.eliminationFinalWinnersCount.value = data.eliminationFinalWinnersCount;
+  }
+  if (data.winnersSubMode != null) els.winnersSubMode.value = data.winnersSubMode;
+  if (data.winnersCount != null) els.winnersCountInput.value = data.winnersCount;
+  els.autoModeCheckbox.checked = !!data.autoMode;
+  if (data.autoWait != null) els.autoWaitInput.value = data.autoWait;
+  els.subBonusCheckbox.checked = !!data.subBonusEnabled;
+  if (data.subExtraTier1 != null) els.subExtraTier1.value = data.subExtraTier1;
+  if (data.subExtraTier2 != null) els.subExtraTier2.value = data.subExtraTier2;
+  if (data.subExtraTier3 != null) els.subExtraTier3.value = data.subExtraTier3;
+
+  if (data.colorPalette) {
+    state.colorPalette = data.colorPalette;
+    els.colorPaletteSelect.value = data.colorPalette;
+  }
+  if (data.wheelScale != null) {
+    els.wheelScaleSlider.value = data.wheelScale;
+    document.documentElement.style.setProperty('--wheel-scale', data.wheelScale / 100);
+  }
+  if (data.rouletteImageMode) {
+    state.rouletteImageMode = data.rouletteImageMode;
+    els.rouletteImageModeSelect.value = data.rouletteImageMode;
+  }
+  if (data.joinCommand) {
+    els.joinCommandInput.value = data.joinCommand;
+    await window.htz.setJoinCommand(data.joinCommand);
+  }
+  els.subsOnlyCheckbox.checked = !!data.subsOnly;
+
+  if (data.theme) {
+    els.themeSelect.value = data.theme;
+    await applyTheme(data.theme);
+  }
+}
+
+[
+  els.spinDurationInput, els.modeSelect, els.eliminationSubMode, els.eliminationArrowCount,
+  els.eliminationFinalWinnersCount, els.winnersSubMode, els.winnersCountInput, els.autoModeCheckbox,
+  els.autoWaitInput, els.subBonusCheckbox, els.subExtraTier1, els.subExtraTier2, els.subExtraTier3,
+  els.colorPaletteSelect, els.wheelScaleSlider, els.rouletteImageModeSelect, els.joinCommandInput,
+  els.subsOnlyCheckbox,
+].forEach((el) => el.addEventListener('change', saveState));
+
+// --- Debug mode: temporary drag-to-reorder for layout tuning (flex `order`,
+// so gaps/margins/padding stay exactly as configured; nothing is persisted) ---
+const DEBUG_CONTAINER_SELECTORS = ['main', '.left-column', '.participants', '.wheel-section', '.settings'];
+let debugDragSource = null;
+
+function onDebugDragStart(e) {
+  debugDragSource = e.currentTarget;
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDebugDragOver(e) {
+  e.preventDefault();
+}
+function onDebugDrop(e) {
+  e.preventDefault();
+  const target = e.currentTarget;
+  if (!debugDragSource || debugDragSource === target) return;
+  const tmp = debugDragSource.style.order;
+  debugDragSource.style.order = target.style.order;
+  target.style.order = tmp;
+}
+
+function setDebugMode(enabled) {
+  document.body.classList.toggle('debug-mode', enabled);
+  DEBUG_CONTAINER_SELECTORS.forEach((sel) => {
+    const container = document.querySelector(sel);
+    if (!container) return;
+    Array.from(container.children).forEach((child, i) => {
+      if (enabled) {
+        if (!child.style.order) child.style.order = String(i);
+        child.draggable = true;
+        child.addEventListener('dragstart', onDebugDragStart);
+        child.addEventListener('dragover', onDebugDragOver);
+        child.addEventListener('drop', onDebugDrop);
+      } else {
+        child.draggable = false;
+        child.removeEventListener('dragstart', onDebugDragStart);
+        child.removeEventListener('dragover', onDebugDragOver);
+        child.removeEventListener('drop', onDebugDrop);
+      }
+    });
+  });
+}
+
+els.debugModeCheckbox.addEventListener('change', () => {
+  setDebugMode(els.debugModeCheckbox.checked);
+});
+
 // --- Init ---
-loadStrings().then(() => {
+loadStrings().then(async () => {
   els.colorPaletteSelect.value = state.colorPalette;
   loadTwitchCredentials();
-  loadThemeList();
+  await loadThemeList();
+  await applySavedState();
   renderParticipants();
   renderLogs();
   updateSettingsVisibility();

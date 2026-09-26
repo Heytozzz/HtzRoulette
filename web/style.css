@@ -90,12 +90,72 @@ main {
   align-items: flex-start;
 }
 
-.participants {
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   flex: 0 0 220px;
   max-width: 220px;
+}
+
+.participants {
   background: rgba(23, 24, 28, 0.75);
   padding: 8px;
   border-radius: 6px;
+}
+
+.logs-box {
+  background: rgba(23, 24, 28, 0.75);
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.logs-box h3 {
+  margin-top: 0;
+}
+
+.logs-box ul {
+  list-style: none;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  font-size: 12px;
+}
+
+.logs-box ul::-webkit-scrollbar {
+  display: none;
+}
+
+.logs-box li {
+  padding: 2px 4px;
+  border-bottom: 1px solid #2a2b31;
+}
+
+.participants li .dup-btn {
+  background: transparent;
+  color: #6fd66f;
+  border: none;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.participants li .dup-btn:hover {
+  color: #8fef8f;
+}
+
+/* --- Debug mode: temporary drag-to-reorder for layout tuning --- */
+.debug-mode [draggable="true"] {
+  outline: 2px dashed #ffcc00;
+  outline-offset: 2px;
+  cursor: grab;
+}
+
+.debug-mode [draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .participants ul {
@@ -372,7 +432,7 @@ main {
   main {
     flex-direction: column;
   }
-  .participants,
+  .left-column,
   .settings {
     max-width: 100%;
   }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <header>
@@ -33,36 +33,45 @@
   </header>
 
   <main>
-    <section class="participants">
-      <h2 data-i18n="participantsTitle">Participantes</h2>
-      <ul id="participantList"></ul>
+    <div class="left-column">
+      <section class="participants">
+        <h2 data-i18n="participantsTitle">Participantes</h2>
+        <ul id="participantList"></ul>
 
-      <div class="add-participant">
-        <input id="manualNameInput" type="text" data-i18n-placeholder="manualNamePlaceholder" placeholder="Nombre" />
-        <label class="inline-label">
-          <input id="manualSubCheckbox" type="checkbox" />
-          <span data-i18n="isSubLabel">Es sub</span>
-        </label>
-        <select id="manualSubTier" class="hidden">
-          <option value="1" data-i18n="tier1">Tier 1</option>
-          <option value="2" data-i18n="tier2">Tier 2</option>
-          <option value="3" data-i18n="tier3">Tier 3</option>
-        </select>
-        <button id="manualAddBtn" data-i18n="addBtn">Añadir</button>
-      </div>
-
-      <button id="shuffleBtn" data-i18n="shuffleBtn">Barajear</button>
-
-      <div class="import-export">
-        <div class="import-export-buttons">
-          <button id="exportBtn" data-i18n="exportBtn">Exportar</button>
-          <button id="importBtn" data-i18n="importBtn">Importar</button>
+        <div class="add-participant">
+          <input id="manualNameInput" type="text" data-i18n-placeholder="manualNamePlaceholder" placeholder="Nombre" />
+          <label class="inline-label">
+            <input id="manualSubCheckbox" type="checkbox" />
+            <span data-i18n="isSubLabel">Es sub</span>
+          </label>
+          <select id="manualSubTier" class="hidden">
+            <option value="1" data-i18n="tier1">Tier 1</option>
+            <option value="2" data-i18n="tier2">Tier 2</option>
+            <option value="3" data-i18n="tier3">Tier 3</option>
+          </select>
+          <button id="manualAddBtn" data-i18n="addBtn">Añadir</button>
         </div>
-        <textarea id="importExportArea" rows="4" data-i18n-placeholder="importExportPlaceholder" placeholder="Un nombre por línea"></textarea>
-      </div>
 
-      <button id="resetBtn" class="reset-btn" data-i18n="reset">Reiniciar lista</button>
-    </section>
+        <button id="shuffleBtn" data-i18n="shuffleBtn">Barajear</button>
+
+        <div class="import-export">
+          <div class="import-export-buttons">
+            <button id="exportBtn" data-i18n="exportBtn">Exportar</button>
+            <button id="importBtn" data-i18n="importBtn">Importar</button>
+          </div>
+          <textarea id="importExportArea" rows="4" data-i18n-placeholder="importExportPlaceholder" placeholder="Un nombre por línea"></textarea>
+        </div>
+
+        <button id="resetBtn" class="reset-btn" data-i18n="reset">Reiniciar lista</button>
+      </section>
+
+      <section class="logs-box">
+        <h3 data-i18n="eliminatedLog">Eliminados</h3>
+        <ul id="eliminatedLogList"></ul>
+        <h3 data-i18n="winnersLog">Ganadores</h3>
+        <ul id="winnersLogList"></ul>
+      </section>
+    </div>
 
     <section class="wheel-section">
       <div id="wheelBox" class="wheel-box">
@@ -132,13 +141,6 @@
           <input id="subExtraTier3" type="number" min="0" max="20" value="3" />
         </div>
       </div>
-
-      <div class="log-section">
-        <h3 data-i18n="eliminatedLog">Eliminados</h3>
-        <ul id="eliminatedLogList"></ul>
-        <h3 data-i18n="winnersLog">Ganadores</h3>
-        <ul id="winnersLogList"></ul>
-      </div>
     </section>
   </main>
 
@@ -192,9 +194,16 @@
       <input id="newThemeRouletteFiles" type="file" accept="image/*" multiple />
       <button id="saveThemeBtn" data-i18n="saveThemeBtn">Guardar tema</button>
       <p class="modal-note" data-i18n="themeSavedNote">Los temas se guardan en este navegador (no se suben a ningún servidor).</p>
+
+      <h3 data-i18n="debugSubcategory">Debug</h3>
+      <label class="inline-label">
+        <input id="debugModeCheckbox" type="checkbox" />
+        <span data-i18n="debugModeLabel">Modo debug (temporal, arrastra cajas/botones)</span>
+      </label>
+      <p class="modal-note" data-i18n="debugModeNote">No se guarda: al recargar la página vuelve al orden normal.</p>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
