@@ -85,6 +85,7 @@ button:hover:not(:disabled) {
 
 main {
   display: flex;
+  flex-wrap: wrap;
   gap: 24px;
   padding: 16px;
   align-items: flex-start;
@@ -133,6 +134,16 @@ main {
   border-bottom: 1px solid #2a2b31;
 }
 
+.participants li .count-badge {
+  background: #3a3b42;
+  color: #ffcc00;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
 .participants li .dup-btn {
   background: transparent;
   color: #6fd66f;
@@ -179,6 +190,20 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+}
+
+.participants li .name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.participants li .actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .participants li .remove-btn {
@@ -315,8 +340,6 @@ main {
   padding: 24px;
   display: inline-flex;
   cursor: pointer;
-  transform: scale(var(--wheel-scale, 1));
-  transform-origin: center;
 }
 
 #wheelCanvas {

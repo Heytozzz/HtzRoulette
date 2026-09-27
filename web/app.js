@@ -194,8 +194,17 @@ els.manualSubCheckbox.addEventListener('change', () => {
   el.addEventListener('input', () => drawWheel());
 });
 
+const WHEEL_BASE_SIZE = 520;
+
+function applyWheelScale(scaleValue) {
+  const size = Math.round(WHEEL_BASE_SIZE * (scaleValue / 100));
+  els.wheelCanvas.width = size;
+  els.wheelCanvas.height = size;
+  drawWheel();
+}
+
 els.wheelScaleSlider.addEventListener('input', () => {
-  document.documentElement.style.setProperty('--wheel-scale', els.wheelScaleSlider.value / 100);
+  applyWheelScale(els.wheelScaleSlider.value);
 });
 
 // --- Participants list ---
@@ -208,39 +217,64 @@ function renderParticipants() {
     saveState();
     return;
   }
-  state.participants.forEach((name, index) => {
+
+  // Group by name for display only (×N badge). The wheel and shuffle still
+  // use the full flat state.participants array, so every extra slot spins
+  // and can be won/eliminated independently.
+  const counts = new Map();
+  state.participants.forEach((name) => counts.set(name, (counts.get(name) || 0) + 1));
+
+  counts.forEach((count, name) => {
     const li = document.createElement('li');
+
+    const nameWrap = document.createElement('span');
+    nameWrap.className = 'name-wrap';
+
     const nameSpan = document.createElement('span');
     nameSpan.textContent = name;
-    li.appendChild(nameSpan);
+    nameWrap.appendChild(nameSpan);
+
+    if (count > 1) {
+      const badge = document.createElement('span');
+      badge.className = 'count-badge';
+      badge.textContent = `×${count}`;
+      nameWrap.appendChild(badge);
+    }
+    li.appendChild(nameWrap);
+
+    const actions = document.createElement('span');
+    actions.className = 'actions';
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'remove-btn';
     removeBtn.textContent = '×';
     removeBtn.title = t('removeTitle');
-    removeBtn.addEventListener('click', () => removeParticipantAt(index));
-    li.appendChild(removeBtn);
+    removeBtn.addEventListener('click', () => removeParticipantByName(name));
+    actions.appendChild(removeBtn);
 
     const dupBtn = document.createElement('button');
     dupBtn.className = 'dup-btn';
     dupBtn.textContent = '+';
     dupBtn.title = t('duplicateTitle');
-    dupBtn.addEventListener('click', () => duplicateParticipantAt(index));
-    li.appendChild(dupBtn);
+    dupBtn.addEventListener('click', () => duplicateParticipantByName(name));
+    actions.appendChild(dupBtn);
 
+    li.appendChild(actions);
     els.participantList.appendChild(li);
   });
   saveState();
 }
 
-function duplicateParticipantAt(index) {
-  const name = state.participants[index];
-  state.participants.splice(index + 1, 0, name);
+function duplicateParticipantByName(name) {
+  const lastIndex = state.participants.lastIndexOf(name);
+  state.participants.splice(lastIndex + 1, 0, name);
   renderParticipants();
   drawWheel();
 }
 
-function removeParticipantAt(index) {
+function removeParticipantByName(name) {
+  const index = state.participants.indexOf(name);
+  if (index === -1) return;
   state.participants.splice(index, 1);
   renderParticipants();
   drawWheel();
@@ -691,6 +725,7 @@ function onSpinComplete(selection, settings) {
     removeIndices(indices);
     renderParticipants();
     renderLogs();
+    drawWheel();
     els.modeStatus.textContent = t('roundEliminated', { names: uniqueRoundNames.join(', ') });
 
     const remainingUniqueNames = [...new Set(state.participants)];
@@ -708,7 +743,6 @@ function onSpinComplete(selection, settings) {
 
     if (settings.autoMode) {
       scheduleAutoSpin(settings.autoWaitMs);
-    } else {
     }
     return;
   }
@@ -721,6 +755,7 @@ function onSpinComplete(selection, settings) {
       removeIndices(indices);
       renderParticipants();
       renderLogs();
+      drawWheel();
       els.winnerText.textContent = t('winnersLabel', { names: uniqueRoundNames.join(', ') });
       return;
     }
@@ -730,6 +765,7 @@ function onSpinComplete(selection, settings) {
     if (!state.winnersLog.includes(name)) state.winnersLog.push(name);
     renderParticipants();
     renderLogs();
+    drawWheel();
     els.modeStatus.textContent = `${state.winnersLog.length}/${settings.winnersCount}`;
 
     const remainingUniqueNames = new Set(state.participants).size;
@@ -741,7 +777,6 @@ function onSpinComplete(selection, settings) {
 
     if (settings.autoMode) {
       scheduleAutoSpin(settings.autoWaitMs);
-    } else {
     }
   }
 }
@@ -1248,7 +1283,7 @@ async function applySavedState() {
   }
   if (data.wheelScale != null) {
     els.wheelScaleSlider.value = data.wheelScale;
-    document.documentElement.style.setProperty('--wheel-scale', data.wheelScale / 100);
+    applyWheelScale(data.wheelScale);
   }
   if (data.rouletteImageMode) {
     state.rouletteImageMode = data.rouletteImageMode;
