@@ -79,6 +79,7 @@
   "twitchCredsNote": "Se guardan solo en este dispositivo, nunca se suben al repositorio.",
   "subsOnlyLabel": "Solo suscriptores",
   "wheelScaleLabel": "Escala de la ruleta",
+  "wheelFontSizeLabel": "Tamaño de letra de la ruleta",
   "duplicateTitle": "Duplicar (dar cupo extra)",
   "debugSubcategory": "Debug",
   "debugModeLabel": "Modo debug (temporal, arrastra cajas/botones)",

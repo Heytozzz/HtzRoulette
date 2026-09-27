@@ -11,6 +11,7 @@ const state = {
   winnersLog: [],
   autoTimer: null,
   colorPalette: 'red',
+  wheelFontScale: 1,
   joinAccepted: false,
   joinCommand: '!join',
   themeImages: { bg: [], roulette: [] },
@@ -79,6 +80,7 @@ const els = {
   closeAppearanceModal: document.getElementById('closeAppearanceModal'),
   colorPaletteSelect: document.getElementById('colorPaletteSelect'),
   wheelScaleSlider: document.getElementById('wheelScaleSlider'),
+  wheelFontSizeSlider: document.getElementById('wheelFontSizeSlider'),
   themeSelect: document.getElementById('themeSelect'),
   deleteThemeBtn: document.getElementById('deleteThemeBtn'),
   rouletteImageModeSelect: document.getElementById('rouletteImageModeSelect'),
@@ -205,6 +207,11 @@ function applyWheelScale(scaleValue) {
 
 els.wheelScaleSlider.addEventListener('input', () => {
   applyWheelScale(els.wheelScaleSlider.value);
+});
+
+els.wheelFontSizeSlider.addEventListener('input', () => {
+  state.wheelFontScale = els.wheelFontSizeSlider.value / 100;
+  drawWheel();
 });
 
 // --- Participants list ---
@@ -498,7 +505,7 @@ function drawColorSlices(cx, cy, radius, count, names) {
       ctx.rotate(start + sliceAngle / 2);
       ctx.textAlign = 'right';
       ctx.fillStyle = '#fff';
-      ctx.font = '14px Segoe UI';
+      ctx.font = `${Math.round(21 * state.wheelFontScale)}px Segoe UI`;
       ctx.fillText(names[i], radius - 10, 4);
       ctx.restore();
     }
@@ -547,7 +554,7 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#fff';
-    ctx.font = '13px Segoe UI';
+    ctx.font = `${Math.round(20 * state.wheelFontScale)}px Segoe UI`;
     ctx.fillText(name, radius - 8, radius * 0.25);
     ctx.restore();
   }
@@ -1233,6 +1240,7 @@ function saveState() {
       subExtraTier3: els.subExtraTier3.value,
       colorPalette: state.colorPalette,
       wheelScale: els.wheelScaleSlider.value,
+      wheelFontSize: els.wheelFontSizeSlider.value,
       theme: els.themeSelect.value,
       rouletteImageMode: state.rouletteImageMode,
       joinCommand: els.joinCommandInput.value,
@@ -1285,6 +1293,10 @@ async function applySavedState() {
     els.wheelScaleSlider.value = data.wheelScale;
     applyWheelScale(data.wheelScale);
   }
+  if (data.wheelFontSize != null) {
+    els.wheelFontSizeSlider.value = data.wheelFontSize;
+    state.wheelFontScale = data.wheelFontSize / 100;
+  }
   if (data.rouletteImageMode) {
     state.rouletteImageMode = data.rouletteImageMode;
     els.rouletteImageModeSelect.value = data.rouletteImageMode;
@@ -1305,7 +1317,7 @@ async function applySavedState() {
   els.spinDurationInput, els.modeSelect, els.eliminationSubMode, els.eliminationArrowCount,
   els.eliminationFinalWinnersCount, els.winnersSubMode, els.winnersCountInput, els.autoModeCheckbox,
   els.autoWaitInput, els.subBonusCheckbox, els.subExtraTier1, els.subExtraTier2, els.subExtraTier3,
-  els.colorPaletteSelect, els.wheelScaleSlider, els.rouletteImageModeSelect, els.joinCommandInput,
+  els.colorPaletteSelect, els.wheelScaleSlider, els.wheelFontSizeSlider, els.rouletteImageModeSelect, els.joinCommandInput,
   els.subsOnlyCheckbox,
 ].forEach((el) => el.addEventListener('change', saveState));
 
