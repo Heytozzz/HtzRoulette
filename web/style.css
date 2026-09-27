@@ -66,7 +66,7 @@ select {
 }
 
 button {
-  background: #6441a5;
+  background: var(--theme-accent, #6441a5);
   border: none;
   color: white;
   padding: 6px 14px;
@@ -80,7 +80,7 @@ button:disabled {
 }
 
 button:hover:not(:disabled) {
-  background: #7d5bbe;
+  background: var(--theme-accent-hover, #7d5bbe);
 }
 
 main {
@@ -142,6 +142,11 @@ main {
   padding: 1px 6px;
   border-radius: 10px;
   margin-left: 6px;
+}
+
+.participants li .sub-name {
+  color: var(--theme-accent, #ffcc00);
+  font-weight: 600;
 }
 
 .participants li .dup-btn {
@@ -335,11 +340,52 @@ main {
 }
 
 .wheel-box {
+  position: relative;
   background: rgba(0, 0, 0, 0.45);
   border-radius: 16px;
   padding: 24px;
   display: inline-flex;
   cursor: pointer;
+}
+
+.eliminated-panel {
+  position: absolute;
+  right: 100%;
+  margin-right: 12px;
+  top: 0;
+  bottom: 0;
+  width: 160px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 16px;
+  padding: 12px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: default;
+}
+
+.eliminated-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.eliminated-panel h3 {
+  margin: 0 0 6px 0;
+  color: #fff;
+  text-shadow: 0 0 4px #000;
+  font-size: 13px;
+}
+
+.eliminated-panel ul {
+  list-style: none;
+  padding: 0;
+  font-size: 12px;
+}
+
+.eliminated-panel li {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  text-shadow: 0 0 3px #000;
 }
 
 #wheelCanvas {

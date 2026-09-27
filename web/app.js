@@ -12,6 +12,7 @@ const state = {
   autoTimer: null,
   colorPalette: 'red',
   wheelFontScale: 1,
+  subNames: new Set(),
   joinAccepted: false,
   joinCommand: '!join',
   themeImages: { bg: [], roulette: [] },
@@ -215,6 +216,10 @@ els.wheelFontSizeSlider.addEventListener('input', () => {
 });
 
 // --- Participants list ---
+function truncateName(name, max = 10) {
+  return name.length > max ? `${name.slice(0, max)}...` : name;
+}
+
 function renderParticipants() {
   els.participantList.innerHTML = '';
   if (state.participants.length === 0) {
@@ -238,7 +243,9 @@ function renderParticipants() {
     nameWrap.className = 'name-wrap';
 
     const nameSpan = document.createElement('span');
-    nameSpan.textContent = name;
+    nameSpan.textContent = truncateName(name);
+    nameSpan.title = name;
+    if (state.subNames.has(name)) nameSpan.classList.add('sub-name');
     nameWrap.appendChild(nameSpan);
 
     if (count > 1) {
@@ -283,6 +290,7 @@ function removeParticipantByName(name) {
   const index = state.participants.indexOf(name);
   if (index === -1) return;
   state.participants.splice(index, 1);
+  if (!state.participants.includes(name)) state.subNames.delete(name);
   renderParticipants();
   drawWheel();
 }
@@ -291,6 +299,7 @@ function removeParticipantByName(name) {
 function addParticipant(username, subTier) {
   if (!username) return;
   if (state.participants.includes(username)) return;
+  if (subTier > 0) state.subNames.add(username);
   const settings = getSettings();
   let copies = 1;
   if (settings.subBonusEnabled && subTier > 0) {
@@ -306,6 +315,7 @@ function addParticipant(username, subTier) {
 // Manual add: allows duplicates on purpose, so sub-bonus extra entries work
 function addManualParticipant(name, isSub, tier) {
   if (!name) return;
+  if (isSub) state.subNames.add(name);
   const settings = getSettings();
   let copies = 1;
   if (settings.subBonusEnabled && isSub) {
@@ -329,7 +339,7 @@ function shuffleParticipants() {
 
 function renderLogs() {
   els.eliminatedLogList.innerHTML = '';
-  state.eliminatedLog.forEach((name) => {
+  [...state.eliminatedLog].reverse().forEach((name) => {
     const li = document.createElement('li');
     li.textContent = name;
     els.eliminatedLogList.appendChild(li);
@@ -504,7 +514,7 @@ function drawColorSlices(cx, cy, radius, count, names) {
       ctx.save();
       ctx.rotate(start + sliceAngle / 2);
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = state.subNames.has(names[i]) ? '#ffd700' : '#fff';
       ctx.font = `${Math.round(21 * state.wheelFontScale)}px Segoe UI`;
       ctx.fillText(names[i], radius - 10, 4);
       ctx.restore();
@@ -553,7 +563,7 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
     }
 
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = state.subNames.has(name) ? '#ffd700' : '#fff';
     ctx.font = `${Math.round(20 * state.wheelFontScale)}px Segoe UI`;
     ctx.fillText(name, radius - 8, radius * 0.25);
     ctx.restore();
@@ -794,6 +804,7 @@ function resetParticipants() {
   state.rotation = 0;
   state.eliminatedLog = [];
   state.winnersLog = [];
+  state.subNames.clear();
   state.spinning = false;
   els.winnerText.textContent = '';
   els.modeStatus.textContent = '';
@@ -993,7 +1004,10 @@ els.stopJoinBtn.addEventListener('click', () => {
   els.joinStatusText.textContent = t('joinStopped');
 });
 
-els.wheelBox.addEventListener('click', spin);
+els.wheelBox.addEventListener('click', (e) => {
+  if (e.target.closest('.eliminated-panel')) return;
+  spin();
+});
 els.resetBtn.addEventListener('click', resetParticipants);
 
 els.manualAddBtn.addEventListener('click', () => {
@@ -1023,8 +1037,24 @@ els.appearanceModal.addEventListener('click', (e) => {
   if (e.target === els.appearanceModal) els.appearanceModal.classList.add('hidden');
 });
 
+const THEME_ACCENT_COLORS = {
+  red: ['#c1121f', '#e14a4a'],
+  blue: ['#1261c1', '#4d9de8'],
+  green: ['#2ea52e', '#55c955'],
+  purple: ['#6a1cad', '#8b3fd1'],
+  gray: ['#6b6b6b', '#8a8a8a'],
+  rainbow: ['#6441a5', '#7d5bbe'],
+};
+
+function applyThemeAccent(palette) {
+  const [accent, hover] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
+  document.documentElement.style.setProperty('--theme-accent', accent);
+  document.documentElement.style.setProperty('--theme-accent-hover', hover);
+}
+
 els.colorPaletteSelect.addEventListener('change', () => {
   state.colorPalette = els.colorPaletteSelect.value;
+  applyThemeAccent(state.colorPalette);
   drawWheel();
 });
 
@@ -1044,6 +1074,10 @@ els.importBtn.addEventListener('click', () => {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   state.participants = lines;
+  const stillPresent = new Set(lines);
+  [...state.subNames].forEach((name) => {
+    if (!stillPresent.has(name)) state.subNames.delete(name);
+  });
   renderParticipants();
   drawWheel();
 });
@@ -1223,6 +1257,7 @@ function saveState() {
   try {
     const data = {
       participants: state.participants,
+      subNames: [...state.subNames],
       eliminatedLog: state.eliminatedLog,
       winnersLog: state.winnersLog,
       spinDuration: els.spinDurationInput.value,
@@ -1266,6 +1301,7 @@ async function applySavedState() {
   if (!data) return;
 
   state.participants = Array.isArray(data.participants) ? data.participants : [];
+  state.subNames = new Set(Array.isArray(data.subNames) ? data.subNames : []);
   state.eliminatedLog = Array.isArray(data.eliminatedLog) ? data.eliminatedLog : [];
   state.winnersLog = Array.isArray(data.winnersLog) ? data.winnersLog : [];
 
@@ -1288,6 +1324,7 @@ async function applySavedState() {
   if (data.colorPalette) {
     state.colorPalette = data.colorPalette;
     els.colorPaletteSelect.value = data.colorPalette;
+    applyThemeAccent(data.colorPalette);
   }
   if (data.wheelScale != null) {
     els.wheelScaleSlider.value = data.wheelScale;
@@ -1371,6 +1408,7 @@ els.debugModeCheckbox.addEventListener('change', () => {
 // --- Init ---
 loadStrings().then(async () => {
   els.colorPaletteSelect.value = state.colorPalette;
+  applyThemeAccent(state.colorPalette);
   loadTwitchCredentials();
   await refreshThemeSelect();
   await applySavedState();
