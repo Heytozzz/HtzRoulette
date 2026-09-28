@@ -510,11 +510,11 @@ main {
 /* OBS overlays: index.html?overlay=wheel|eliminated|participants&room=... */
 body.overlay-mode { background: transparent !important; margin: 0; padding: 0; overflow: hidden; }
 #overlayRoot { display: flex; flex-direction: column; align-items: center; padding: 8px; }
-#overlayRoot ul { list-style: none; margin: 0; padding: 0; width: 100%; color: #fff; font-size: 26px; font-weight: 600; text-shadow: 0 0 4px #000, 0 2px 3px #000; }
-#overlayRoot li { padding: 2px 0; }
+#overlayRoot .participants,
+#overlayRoot .eliminated-panel { width: 100%; }
+#overlayRoot .participants ul { max-height: none; overflow: hidden; }
+#overlayRoot .eliminated-panel { position: static; margin: 0; height: auto; overflow: hidden; }
 #overlayRoot .actions { display: none; }
-#overlayRoot .count-badge { margin-left: 6px; opacity: 0.8; }
-#overlayRoot .sub-name { color: var(--theme-accent, #ffcc00); }
 #overlayRoot #modeStatus { color: #fff; text-shadow: 0 0 4px #000; margin-top: 6px; }
 .overlay-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 .overlay-row input { flex: 1; min-width: 0; }
