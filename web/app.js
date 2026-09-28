@@ -736,10 +736,11 @@ function spinEasing(x) {
 // time) when the browser stops delivering animation frames in the background.
 function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle, onDone }) {
   const startTime = performance.now();
-  let lastBoundaryIndex = null;
   let lastStep = 0;
   let finished = false;
   let watchdog = null;
+
+  scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle });
 
   function step() {
     if (finished) return;
@@ -749,16 +750,9 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
     state.rotation = startRotation + (targetRotation - startRotation) * spinEasing(progress);
     drawWheel();
 
-    const boundaryIndex = Math.floor(normalizeAngle(-state.rotation) / sliceAngle);
-    if (lastBoundaryIndex !== null && boundaryIndex !== lastBoundaryIndex) {
-      playTickSound();
-    }
-    lastBoundaryIndex = boundaryIndex;
-
     if (progress >= 1) {
       finished = true;
       bgTimers.clear(watchdog);
-      playLandingSound();
       onDone();
     }
   }
@@ -1318,41 +1312,86 @@ function getAudioCtx() {
   return audioCtx;
 }
 
-function playTickSound() {
-  if (IS_OVERLAY && !OVERLAY_SOUND) return;
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 900;
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.05);
-  } catch (err) {
-    // Audio may be unavailable/blocked; fail silently
-  }
+// Unlock/create the AudioContext on the first user gesture so it is already
+// running (not suspended) when a spin starts from a background tab.
+function unlockAudio() {
+  try { getAudioCtx(); } catch (err) { /* audio unavailable */ }
+}
+['pointerdown', 'keydown', 'touchstart'].forEach((ev) => {
+  window.addEventListener(ev, unlockAudio, { passive: true });
+});
+document.addEventListener('visibilitychange', () => {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+});
+
+function scheduleTick(ctx, when) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = 900;
+  gain.gain.setValueAtTime(0.12, when);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(when);
+  osc.stop(when + 0.05);
 }
 
-function playLandingSound() {
+function scheduleLanding(ctx, when) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(420, when);
+  osc.frequency.exponentialRampToValueAtTime(140, when + 0.35);
+  gain.gain.setValueAtTime(0.35, when);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + 0.45);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(when);
+  osc.stop(when + 0.45);
+}
+
+// The spin is fully deterministic (same easing/duration as the animation), so
+// every tick and the landing sound are computed up front and scheduled on the
+// audio clock. The audio thread plays them on time regardless of whether the
+// tab is in the background or the main thread is throttled.
+function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle }) {
   if (IS_OVERLAY && !OVERLAY_SOUND) return;
+  let ctx;
   try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(420, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.35);
-    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.45);
+    ctx = getAudioCtx();
   } catch (err) {
-    // Audio may be unavailable/blocked; fail silently
+    return;
   }
+  const startPerf = performance.now();
+
+  const tickTimesMs = [];
+  const MIN_TICK_GAP_MS = 20;
+  let lastIndex = null;
+  let lastTickMs = -Infinity;
+  for (let ms = 0; ms <= duration; ms += 2) {
+    const rot = startRotation + (targetRotation - startRotation) * spinEasing(ms / duration);
+    const idx = Math.floor(normalizeAngle(-rot) / sliceAngle);
+    if (lastIndex !== null && idx !== lastIndex && ms - lastTickMs >= MIN_TICK_GAP_MS) {
+      tickTimesMs.push(ms);
+      lastTickMs = ms;
+    }
+    lastIndex = idx;
+  }
+
+  const schedule = () => {
+    try {
+      const elapsedMs = performance.now() - startPerf;
+      const spinStartOnAudioClock = ctx.currentTime - elapsedMs / 1000;
+      tickTimesMs.forEach((ms) => {
+        if (ms >= elapsedMs) scheduleTick(ctx, spinStartOnAudioClock + ms / 1000);
+      });
+      if (duration >= elapsedMs) scheduleLanding(ctx, spinStartOnAudioClock + duration / 1000);
+    } catch (err) {
+      // Audio may be unavailable/blocked; fail silently
+    }
+  };
+
+  if (ctx.state === 'running') schedule();
+  else ctx.resume().then(schedule).catch(() => {});
 }
 
 // --- Persist settings + participants across page reloads ---
