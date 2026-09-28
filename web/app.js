@@ -26,6 +26,54 @@ const state = {
   twitchSocket: null,
 };
 
+// Overlay mode: index.html?overlay=wheel|eliminated|participants&room=XXXX
+const OVERLAY_PARAMS = new URLSearchParams(location.search);
+const OVERLAY_TYPE = OVERLAY_PARAMS.get('overlay');
+const IS_OVERLAY = ['wheel', 'eliminated', 'participants'].includes(OVERLAY_TYPE);
+const OVERLAY_SOUND = OVERLAY_PARAMS.get('sound') === '1';
+
+// Timers that keep running in background tabs/minimized windows. Browsers
+// throttle/pause setTimeout and requestAnimationFrame there, but timers
+// living inside a Web Worker are not throttled. Falls back to normal timers.
+const bgTimers = (() => {
+  let worker = null;
+  const entries = new Map();
+  let nextId = 1;
+  try {
+    const src = 'const t=new Map();onmessage=(e)=>{const{c,id,ms,rep}=e.data;'
+      + 'if(c==="set"){t.set(id,(rep?setInterval:setTimeout)(()=>{if(!rep)t.delete(id);postMessage(id)},ms))}'
+      + 'else{const h=t.get(id);if(h!==undefined){clearTimeout(h);clearInterval(h);t.delete(id)}}}';
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    worker.onmessage = (e) => {
+      const en = entries.get(e.data);
+      if (!en) return;
+      if (!en.rep) entries.delete(e.data);
+      en.fn();
+    };
+  } catch (err) {
+    worker = null;
+  }
+  function set(fn, ms, rep) {
+    const id = nextId++;
+    if (worker) {
+      entries.set(id, { fn, rep });
+      worker.postMessage({ c: 'set', id, ms, rep });
+    } else {
+      const h = (rep ? setInterval : setTimeout)(() => { if (!rep) entries.delete(id); fn(); }, ms);
+      entries.set(id, { h });
+    }
+    return id;
+  }
+  function clear(id) {
+    const en = entries.get(id);
+    if (!en) return;
+    entries.delete(id);
+    if (worker) worker.postMessage({ c: 'clear', id });
+    else { clearTimeout(en.h); clearInterval(en.h); }
+  }
+  return { timeout: (fn, ms) => set(fn, ms, false), interval: (fn, ms) => set(fn, ms, true), clear };
+})();
+
 const PLACEHOLDER_SLICE_COUNT = 8;
 
 const els = {
@@ -92,6 +140,7 @@ const els = {
   newThemeRouletteFiles: document.getElementById('newThemeRouletteFiles'),
   saveThemeBtn: document.getElementById('saveThemeBtn'),
   debugModeCheckbox: document.getElementById('debugModeCheckbox'),
+  overlayStatusText: document.getElementById('overlayStatusText'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -223,9 +272,11 @@ function truncateName(name, max = 10) {
 function renderParticipants() {
   els.participantList.innerHTML = '';
   if (state.participants.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = t('empty');
-    els.participantList.appendChild(li);
+    if (!IS_OVERLAY) {
+      const li = document.createElement('li');
+      li.textContent = t('empty');
+      els.participantList.appendChild(li);
+    }
     saveState();
     return;
   }
@@ -351,6 +402,7 @@ function renderLogs() {
     li.textContent = name;
     els.winnersLogList.appendChild(li);
   });
+  queueOverlaySync();
 }
 
 function getLoadedImage(url) {
@@ -668,6 +720,60 @@ function getSelectionForRotation(rotation, pointerCount) {
 }
 
 // --- Spin logic ---
+function spinEasing(x) {
+  const rampFraction = 0.1;
+  const rampDistance = 0.18;
+  if (x < rampFraction) {
+    return (x / rampFraction) * rampDistance;
+  }
+  const remaining = (x - rampFraction) / (1 - rampFraction);
+  const easeOutQuart = 1 - Math.pow(1 - remaining, 4);
+  return rampDistance + (1 - rampDistance) * easeOutQuart;
+}
+
+// Time-based animation. requestAnimationFrame draws it smoothly while the
+// tab is visible; a Web Worker watchdog keeps stepping it (and finishes it on
+// time) when the browser stops delivering animation frames in the background.
+function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle, onDone }) {
+  const startTime = performance.now();
+  let lastBoundaryIndex = null;
+  let lastStep = 0;
+  let finished = false;
+  let watchdog = null;
+
+  function step() {
+    if (finished) return;
+    const now = performance.now();
+    lastStep = now;
+    const progress = Math.min((now - startTime) / duration, 1);
+    state.rotation = startRotation + (targetRotation - startRotation) * spinEasing(progress);
+    drawWheel();
+
+    const boundaryIndex = Math.floor(normalizeAngle(-state.rotation) / sliceAngle);
+    if (lastBoundaryIndex !== null && boundaryIndex !== lastBoundaryIndex) {
+      playTickSound();
+    }
+    lastBoundaryIndex = boundaryIndex;
+
+    if (progress >= 1) {
+      finished = true;
+      bgTimers.clear(watchdog);
+      playLandingSound();
+      onDone();
+    }
+  }
+
+  function frame() {
+    if (finished) return;
+    step();
+    requestAnimationFrame(frame);
+  }
+
+  watchdog = bgTimers.interval(() => {
+    if (performance.now() - lastStep > 60) step();
+  }, 30);
+  requestAnimationFrame(frame);
+}
 function spin() {
   if (state.spinning || state.participants.length === 0) return;
   state.spinning = true;
@@ -689,42 +795,14 @@ function spin() {
   const targetRotation = startRotation + alignmentDelta + extraSpins * Math.PI * 2;
 
   const duration = settings.spinDurationMs;
-  const startTime = performance.now();
-  let lastBoundaryIndex = null;
-
-  function spinEasing(x) {
-    const rampFraction = 0.1;
-    const rampDistance = 0.18;
-    if (x < rampFraction) {
-      return (x / rampFraction) * rampDistance;
-    }
-    const remaining = (x - rampFraction) / (1 - rampFraction);
-    const easeOutQuart = 1 - Math.pow(1 - remaining, 4);
-    return rampDistance + (1 - rampDistance) * easeOutQuart;
-  }
-
-  function animate(now) {
-    const elapsed = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    const eased = spinEasing(progress);
-    state.rotation = startRotation + (targetRotation - startRotation) * eased;
-    drawWheel();
-
-    const boundaryIndex = Math.floor(normalizeAngle(-state.rotation) / sliceAngle);
-    if (lastBoundaryIndex !== null && boundaryIndex !== lastBoundaryIndex) {
-      playTickSound();
-    }
-    lastBoundaryIndex = boundaryIndex;
-
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      playLandingSound();
-      onSpinComplete(getSelectionForRotation(state.rotation, pointerCount), settings);
-    }
-  }
-
-  requestAnimationFrame(animate);
+  sendOverlay({ t: 'spin', startRotation, targetRotation, duration });
+  runSpinAnimation({
+    startRotation,
+    targetRotation,
+    duration,
+    sliceAngle,
+    onDone: () => onSpinComplete(getSelectionForRotation(state.rotation, pointerCount), settings),
+  });
 }
 
 function removeIndices(indices) {
@@ -733,8 +811,8 @@ function removeIndices(indices) {
 }
 
 function scheduleAutoSpin(waitMs) {
-  clearTimeout(state.autoTimer);
-  state.autoTimer = setTimeout(() => {
+  bgTimers.clear(state.autoTimer);
+  state.autoTimer = bgTimers.timeout(() => {
     spin();
   }, waitMs);
 }
@@ -811,7 +889,7 @@ function onSpinComplete(selection, settings) {
 }
 
 function resetParticipants() {
-  clearTimeout(state.autoTimer);
+  bgTimers.clear(state.autoTimer);
   state.participants = [];
   state.rotation = 0;
   state.eliminatedLog = [];
@@ -1241,6 +1319,7 @@ function getAudioCtx() {
 }
 
 function playTickSound() {
+  if (IS_OVERLAY && !OVERLAY_SOUND) return;
   try {
     const ctx = getAudioCtx();
     const osc = ctx.createOscillator();
@@ -1258,6 +1337,7 @@ function playTickSound() {
 }
 
 function playLandingSound() {
+  if (IS_OVERLAY && !OVERLAY_SOUND) return;
   try {
     const ctx = getAudioCtx();
     const osc = ctx.createOscillator();
@@ -1279,6 +1359,8 @@ function playLandingSound() {
 const SAVED_STATE_KEY = 'htz_saved_state';
 
 function saveState() {
+  if (IS_OVERLAY) return;
+  queueOverlaySync();
   try {
     const data = {
       participants: state.participants,
@@ -1430,15 +1512,302 @@ els.debugModeCheckbox.addEventListener('change', () => {
   setDebugMode(els.debugModeCheckbox.checked);
 });
 
+// --- OBS overlays ---
+// The control page (host) pushes its state to overlay pages over WebRTC
+// (PeerJS public signaling, no own server) and BroadcastChannel (same browser).
+// Overlays run the same wheel code and replay each spin locally.
+const OVERLAY_SETTING_KEYS = [
+  'modeSelect', 'eliminationSubMode', 'eliminationArrowCount',
+  'eliminationFinalWinnersCount', 'winnersSubMode', 'winnersCountInput',
+];
+const overlaySid = Math.random().toString(36).slice(2);
+const overlayConns = new Set();
+const overlayDataUrls = new Map();
+let overlaySeq = 0;
+let overlayLastSeq = 0;
+let overlayRemoteSid = null;
+let overlayChannel = null;
+let overlayQueued = false;
+let overlayImagesSig = '';
+let overlaySpinning = false;
+let overlayPending = null;
+let overlayScale = null;
+
+function getOverlayRoom() {
+  if (IS_OVERLAY) return OVERLAY_PARAMS.get('room') || '';
+  let room = localStorage.getItem('htz_overlay_room');
+  if (!room) {
+    room = Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => (b % 36).toString(36)).join('');
+    localStorage.setItem('htz_overlay_room', room);
+  }
+  return room;
+}
+
+function sendOverlay(msg) {
+  if (IS_OVERLAY) return;
+  msg.sid = overlaySid;
+  msg.seq = ++overlaySeq;
+  overlayConns.forEach((c) => { if (c.open) c.send(msg); });
+  if (overlayChannel) overlayChannel.postMessage(msg);
+}
+
+function toDataUrl(blobUrl) {
+  if (!blobUrl || !blobUrl.startsWith('blob:')) return blobUrl;
+  if (overlayDataUrls.has(blobUrl)) return overlayDataUrls.get(blobUrl);
+  overlayDataUrls.set(blobUrl, null);
+  fetch(blobUrl)
+    .then((r) => r.blob())
+    .then((b) => new Promise((res) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.readAsDataURL(b);
+    }))
+    .then((d) => {
+      overlayDataUrls.set(blobUrl, d);
+      queueOverlaySync();
+    })
+    .catch(() => {});
+  return null;
+}
+
+function overlaySnapshot() {
+  const settings = {};
+  OVERLAY_SETTING_KEYS.forEach((k) => { settings[k] = els[k].value; });
+  return {
+    t: 'state',
+    participants: state.participants,
+    subNames: [...state.subNames],
+    eliminatedLog: state.eliminatedLog,
+    winnersLog: state.winnersLog,
+    rotation: state.rotation,
+    colorPalette: state.colorPalette,
+    wheelFontScale: state.wheelFontScale,
+    wheelScale: els.wheelScaleSlider.value,
+    rouletteImageMode: state.rouletteImageMode,
+    settings,
+    winnerText: els.winnerText.textContent,
+    modeStatus: els.modeStatus.textContent,
+  };
+}
+
+function overlayImagesMessage() {
+  const pool = state.themeImages.roulette;
+  const idx = {};
+  state.playerImageMap.forEach((url, name) => {
+    const i = pool.indexOf(url);
+    if (i >= 0) idx[name] = i;
+  });
+  return {
+    t: 'images',
+    list: pool.map(toDataUrl),
+    idx,
+    full: state.fullWheelImageUrl ? pool.indexOf(state.fullWheelImageUrl) : -1,
+    profiles: [...state.profilePhotoMap],
+  };
+}
+
+function queueOverlaySync() {
+  if (IS_OVERLAY || overlayQueued) return;
+  overlayQueued = true;
+  // Microtask: runs right after the current logic, and isn't throttled in background tabs
+  queueMicrotask(() => {
+    overlayQueued = false;
+    sendOverlay(overlaySnapshot());
+    const img = overlayImagesMessage();
+    const sig = JSON.stringify({ l: img.list.map((x) => (x ? x.length : 0)), i: img.idx, f: img.full, p: img.profiles });
+    if (sig !== overlayImagesSig) {
+      overlayImagesSig = sig;
+      sendOverlay(img);
+    }
+  });
+}
+
+function updateOverlayStatus(err) {
+  if (!els.overlayStatusText) return;
+  els.overlayStatusText.textContent = err
+    ? `Overlays: error (${err})`
+    : t('overlayStatus', { n: overlayConns.size });
+}
+
+function fillOverlayLinks(room) {
+  const base = `${location.origin}${location.pathname}`;
+  [['overlayLinkWheel', 'wheel'], ['overlayLinkEliminated', 'eliminated'], ['overlayLinkParticipants', 'participants']]
+    .forEach(([id, type]) => {
+      document.getElementById(id).value = `${base}?overlay=${type}&room=${room}`;
+    });
+  document.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const input = document.getElementById(btn.dataset.copy);
+      input.select();
+      try { await navigator.clipboard.writeText(input.value); } catch (err) { document.execCommand('copy'); }
+    });
+  });
+}
+
+function startOverlayHost() {
+  const room = getOverlayRoom();
+  fillOverlayLinks(room);
+
+  try {
+    overlayChannel = new BroadcastChannel(`htz-${room}`);
+    overlayChannel.onmessage = (e) => {
+      if (e.data && e.data.t === 'hello') { overlayImagesSig = ''; queueOverlaySync(); }
+    };
+  } catch (err) {
+    overlayChannel = null;
+  }
+
+  const mo = new MutationObserver(() => queueOverlaySync());
+  [els.winnerText, els.modeStatus].forEach((el) => mo.observe(el, { childList: true, characterData: true, subtree: true }));
+
+  if (!window.Peer) { updateOverlayStatus('PeerJS no cargó'); return; }
+  const open = () => {
+    const peer = new Peer(`htzroulette-${room}`);
+    peer.on('connection', (conn) => {
+      conn.on('open', () => {
+        overlayConns.add(conn);
+        updateOverlayStatus();
+        overlayImagesSig = '';
+        queueOverlaySync();
+      });
+      const drop = () => { overlayConns.delete(conn); updateOverlayStatus(); };
+      conn.on('close', drop);
+      conn.on('error', drop);
+    });
+    peer.on('open', () => updateOverlayStatus());
+    peer.on('disconnected', () => peer.reconnect());
+    peer.on('error', (err) => {
+      if (err.type === 'unavailable-id') {
+        // Old registration still lingering or another tab is open: retry shortly
+        peer.destroy();
+        updateOverlayStatus('ID en uso, reintentando');
+        setTimeout(open, 4000);
+      } else {
+        updateOverlayStatus(err.type);
+      }
+    });
+  };
+  open();
+}
+
+function initOverlayMode() {
+  document.body.classList.add('overlay-mode', `overlay-${OVERLAY_TYPE}`);
+  document.title = `HtzRoulette overlay: ${OVERLAY_TYPE}`;
+  const root = document.createElement('div');
+  root.id = 'overlayRoot';
+  const parts = {
+    wheel: [els.wheelCanvas, els.winnerText, els.modeStatus],
+    eliminated: [els.eliminatedLogList],
+    participants: [els.participantList],
+  }[OVERLAY_TYPE];
+  parts.forEach((el) => root.appendChild(el));
+  Array.from(document.body.children).forEach((c) => { if (c.tagName !== 'SCRIPT') c.style.display = 'none'; });
+  document.body.appendChild(root);
+}
+
+function applyOverlayState(m, keepRotation) {
+  state.participants = m.participants;
+  state.subNames = new Set(m.subNames);
+  state.eliminatedLog = m.eliminatedLog;
+  state.winnersLog = m.winnersLog;
+  if (!keepRotation) state.rotation = m.rotation;
+  state.colorPalette = m.colorPalette;
+  state.wheelFontScale = m.wheelFontScale;
+  state.rouletteImageMode = m.rouletteImageMode;
+  Object.entries(m.settings).forEach(([k, v]) => { els[k].value = v; });
+  els.winnerText.textContent = m.winnerText;
+  els.modeStatus.textContent = m.modeStatus;
+  applyThemeAccent(m.colorPalette);
+  if (m.wheelScale !== overlayScale) {
+    overlayScale = m.wheelScale;
+    applyWheelScale(m.wheelScale);
+  }
+  renderParticipants();
+  renderLogs();
+  drawWheel();
+}
+
+function applyOverlayImages(m) {
+  state.playerImageMap = new Map(Object.entries(m.idx).map(([n, i]) => [n, m.list[i]]));
+  state.fullWheelImageUrl = m.full >= 0 ? m.list[m.full] : null;
+  state.profilePhotoMap = new Map(m.profiles);
+  drawWheel();
+}
+
+function handleOverlayMessage(m) {
+  if (!m || !m.t || m.t === 'hello') return;
+  if (m.sid !== overlayRemoteSid) { overlayRemoteSid = m.sid; overlayLastSeq = 0; }
+  if (m.seq <= overlayLastSeq) return; // same message arriving via both transports
+  overlayLastSeq = m.seq;
+
+  if (m.t === 'images') { applyOverlayImages(m); return; }
+
+  if (m.t === 'spin') {
+    if (overlaySpinning) return;
+    overlaySpinning = true;
+    els.winnerText.textContent = '';
+    runSpinAnimation({
+      startRotation: m.startRotation,
+      targetRotation: m.targetRotation,
+      duration: m.duration,
+      sliceAngle: (Math.PI * 2) / Math.max(1, state.participants.length),
+      onDone: () => {
+        overlaySpinning = false;
+        if (overlayPending) {
+          const p = overlayPending;
+          overlayPending = null;
+          applyOverlayState(p, true);
+        }
+      },
+    });
+    return;
+  }
+
+  // State updates that arrive mid-spin wait until the wheel stops
+  if (overlaySpinning) overlayPending = m;
+  else applyOverlayState(m, false);
+}
+
+function startOverlayClient() {
+  const room = getOverlayRoom();
+  if (!room) return;
+  try {
+    const ch = new BroadcastChannel(`htz-${room}`);
+    ch.onmessage = (e) => handleOverlayMessage(e.data);
+    ch.postMessage({ t: 'hello' });
+  } catch (err) { /* BroadcastChannel unavailable */ }
+
+  if (!window.Peer) return;
+  const peer = new Peer();
+  let retry = null;
+  const scheduleConnect = () => { clearTimeout(retry); retry = setTimeout(connect, 2000); };
+  function connect() {
+    if (peer.destroyed || peer.disconnected) { scheduleConnect(); return; }
+    const conn = peer.connect(`htzroulette-${room}`, { reliable: true });
+    conn.on('data', handleOverlayMessage);
+    conn.on('close', scheduleConnect);
+    conn.on('error', scheduleConnect);
+  }
+  peer.on('open', connect);
+  peer.on('disconnected', () => peer.reconnect());
+  peer.on('error', (err) => { if (err.type === 'peer-unavailable') scheduleConnect(); });
+}
+
 // --- Init ---
 loadStrings().then(async () => {
   els.colorPaletteSelect.value = state.colorPalette;
   applyThemeAccent(state.colorPalette);
-  loadTwitchCredentials();
-  await refreshThemeSelect();
-  await applySavedState();
+  if (IS_OVERLAY) {
+    initOverlayMode();
+  } else {
+    loadTwitchCredentials();
+    await refreshThemeSelect();
+    await applySavedState();
+  }
   renderParticipants();
   renderLogs();
   updateSettingsVisibility();
   drawWheel();
+  if (IS_OVERLAY) startOverlayClient();
+  else startOverlayHost();
 });

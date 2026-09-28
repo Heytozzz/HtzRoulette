@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
   <header>
@@ -199,6 +199,16 @@
       <button id="saveThemeBtn" data-i18n="saveThemeBtn">Guardar tema</button>
       <p class="modal-note" data-i18n="themeSavedNote">Los temas se guardan en este navegador (no se suben a ningún servidor).</p>
 
+      <h3 data-i18n="overlaysTitle">Overlays para OBS</h3>
+      <p class="modal-note" data-i18n="overlaysNote">Añade cada link como "Fuente de navegador" en OBS. Esta página debe seguir abierta para que los overlays se actualicen.</p>
+      <label data-i18n="overlayWheelLabel">Ruleta + mensajes de ganador/eliminado</label>
+      <div class="overlay-row"><input id="overlayLinkWheel" type="text" readonly /><button data-copy="overlayLinkWheel" data-i18n="copyBtn">Copiar</button></div>
+      <label data-i18n="overlayEliminatedLabel">Lista de eliminados</label>
+      <div class="overlay-row"><input id="overlayLinkEliminated" type="text" readonly /><button data-copy="overlayLinkEliminated" data-i18n="copyBtn">Copiar</button></div>
+      <label data-i18n="overlayParticipantsLabel">Lista de participantes</label>
+      <div class="overlay-row"><input id="overlayLinkParticipants" type="text" readonly /><button data-copy="overlayLinkParticipants" data-i18n="copyBtn">Copiar</button></div>
+      <p id="overlayStatusText" class="modal-note"></p>
+
       <h3 data-i18n="debugSubcategory">Debug</h3>
       <label class="inline-label">
         <input id="debugModeCheckbox" type="checkbox" />
@@ -208,6 +218,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

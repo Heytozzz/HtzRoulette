@@ -90,5 +90,12 @@
   "newThemeRouletteLabel": "Imágenes de ruleta",
   "saveThemeBtn": "Guardar tema",
   "deleteThemeBtn": "Eliminar tema",
-  "themeSavedNote": "Los temas se guardan en este navegador (no se suben a ningún servidor)."
+  "themeSavedNote": "Los temas se guardan en este navegador (no se suben a ningún servidor).",
+  "overlaysTitle": "Overlays para OBS",
+  "overlaysNote": "Añade cada link como \"Fuente de navegador\" en OBS. Esta página debe seguir abierta para que los overlays se actualicen.",
+  "overlayWheelLabel": "Ruleta + mensajes de ganador/eliminado",
+  "overlayEliminatedLabel": "Lista de eliminados",
+  "overlayParticipantsLabel": "Lista de participantes",
+  "copyBtn": "Copiar",
+  "overlayStatus": "Overlays conectados: {n}"
 }
