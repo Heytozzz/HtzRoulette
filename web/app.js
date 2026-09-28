@@ -514,9 +514,15 @@ function drawColorSlices(cx, cy, radius, count, names) {
       ctx.save();
       ctx.rotate(start + sliceAngle / 2);
       ctx.textAlign = 'right';
-      ctx.fillStyle = state.subNames.has(names[i]) ? '#ffd700' : '#fff';
+      const isSub = state.subNames.has(names[i]);
+      ctx.fillStyle = isSub ? getSubNeonColor() : '#fff';
       ctx.font = `${Math.round(21 * state.wheelFontScale)}px Segoe UI`;
+      if (isSub) {
+        ctx.shadowColor = getSubNeonColor();
+        ctx.shadowBlur = 10;
+      }
       ctx.fillText(names[i], radius - 10, 4);
+      ctx.shadowBlur = 0;
       ctx.restore();
     }
   }
@@ -563,9 +569,15 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
     }
 
     ctx.textAlign = 'right';
-    ctx.fillStyle = state.subNames.has(name) ? '#ffd700' : '#fff';
+    const nameIsSub = state.subNames.has(name);
+    ctx.fillStyle = nameIsSub ? getSubNeonColor() : '#fff';
     ctx.font = `${Math.round(20 * state.wheelFontScale)}px Segoe UI`;
+    if (nameIsSub) {
+      ctx.shadowColor = getSubNeonColor();
+      ctx.shadowBlur = 10;
+    }
     ctx.fillText(name, radius - 8, radius * 0.25);
+    ctx.shadowBlur = 0;
     ctx.restore();
   }
   ctx.restore();
@@ -1045,6 +1057,19 @@ const THEME_ACCENT_COLORS = {
   gray: ['#6b6b6b', '#8a8a8a'],
   rainbow: ['#6441a5', '#7d5bbe'],
 };
+
+const SUB_NEON_COLORS = {
+  red: '#ff3b3b',
+  blue: '#3bb0ff',
+  green: '#39ff6a',
+  purple: '#c23bff',
+  gray: '#e8e8e8',
+  rainbow: '#ffd700',
+};
+
+function getSubNeonColor() {
+  return SUB_NEON_COLORS[state.colorPalette] || SUB_NEON_COLORS.red;
+}
 
 function applyThemeAccent(palette) {
   const [accent, hover] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
