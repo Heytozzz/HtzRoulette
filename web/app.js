@@ -1699,24 +1699,20 @@ function initOverlayMode() {
   const root = document.createElement('div');
   root.id = 'overlayRoot';
 
-  // Lists reuse the exact same wrapper classes as the control page so the
-  // existing CSS (scoped to .participants / .eliminated-panel) applies as-is.
+  // Lists get their own dedicated panel (title + list), sized to fit the list.
   if (OVERLAY_TYPE === 'wheel') {
     [els.wheelCanvas, els.winnerText, els.modeStatus].forEach((el) => root.appendChild(el));
-  } else if (OVERLAY_TYPE === 'participants') {
-    const box = document.createElement('section');
-    box.className = 'participants';
-    const title = document.createElement('h2');
-    title.textContent = t('participantsTitle');
-    box.append(title, els.participantList);
-    root.appendChild(box);
   } else {
-    const box = document.createElement('div');
-    box.className = 'eliminated-panel';
-    const title = document.createElement('h3');
-    title.textContent = t('eliminatedLog');
-    box.append(title, els.eliminatedLogList);
-    root.appendChild(box);
+    const isParticipants = OVERLAY_TYPE === 'participants';
+    const panel = document.createElement('div');
+    panel.className = 'ov-panel';
+    const title = document.createElement('div');
+    title.className = 'ov-title';
+    title.textContent = t(isParticipants ? 'participantsTitle' : 'eliminatedLog');
+    const list = isParticipants ? els.participantList : els.eliminatedLogList;
+    list.classList.add('ov-list');
+    panel.append(title, list);
+    root.appendChild(panel);
   }
 
   Array.from(document.body.children).forEach((c) => { if (c.tagName !== 'SCRIPT') c.style.display = 'none'; });

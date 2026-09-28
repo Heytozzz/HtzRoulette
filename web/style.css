@@ -510,10 +510,51 @@ main {
 /* OBS overlays: index.html?overlay=wheel|eliminated|participants&room=... */
 body.overlay-mode { background: transparent !important; margin: 0; padding: 0; overflow: hidden; }
 #overlayRoot { display: flex; flex-direction: column; align-items: center; padding: 8px; }
-#overlayRoot .participants,
-#overlayRoot .eliminated-panel { width: 100%; }
-#overlayRoot .participants ul { max-height: none; overflow: hidden; }
-#overlayRoot .eliminated-panel { position: static; margin: 0; height: auto; overflow: hidden; }
+body.overlay-participants #overlayRoot,
+body.overlay-eliminated #overlayRoot { align-items: flex-start; }
+.ov-panel {
+  width: max-content;
+  min-width: 200px;
+  max-width: 100%;
+  background: rgba(23, 24, 28, 0.5);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.ov-title {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 8px 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--theme-accent, #ffcc00);
+  text-shadow: 0 0 4px #000, 0 2px 3px #000;
+}
+.ov-list { list-style: none; margin: 0; padding: 0; }
+.ov-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 18px;
+  text-shadow: 0 0 4px #000, 0 1px 2px #000;
+}
+.ov-list li:last-child { border-bottom: none; }
+.ov-list .name-wrap { display: flex; align-items: center; gap: 4px; }
+.ov-list .sub-name { color: var(--theme-accent, #ffcc00); font-weight: 600; }
+.ov-list .count-badge {
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffcc00;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+  text-shadow: none;
+}
 #overlayRoot .actions { display: none; }
 #overlayRoot #modeStatus { color: #fff; text-shadow: 0 0 4px #000; margin-top: 6px; }
 .overlay-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
