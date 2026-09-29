@@ -178,7 +178,7 @@
   "soundPackLabel": "Pack de sonidos",
   "soundPackOriginal": "Original",
   "soundPackMinecraft": "Minecraft",
-  "soundPackNote": "Original: tic sintético al girar y un sonido al terminar. Minecraft: click al girar, orbe cuando se selecciona a alguien (por ejemplo al eliminarlo) y level up cuando se elige al ganador final. En los overlays de OBS el sonido sigue apagado salvo que añadas &sound=1 al link.",
+  "soundPackNote": "Cambia cómo se escuchan las interacciones en la página.",
   "soundPreviewTitle": "Probar sonidos",
   "soundPreviewTick": "Giro",
   "soundPreviewSelect": "Selección",
