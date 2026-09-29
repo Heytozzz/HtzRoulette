@@ -553,6 +553,26 @@ function drawWheel() {
   drawPointers(cx, cy, radius);
 }
 
+// Sub names on the wheel: white core, then an outline in the theme's neon
+// color, then a glow of that same color around the outline.
+function drawSubNeonText(text, x, y, fontSize) {
+  const neon = getSubNeonColor();
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.lineWidth = Math.max(3, fontSize * 0.2);
+  ctx.strokeStyle = neon;
+  ctx.shadowColor = neon;
+  ctx.shadowBlur = Math.max(10, fontSize * 0.6);
+  ctx.strokeText(text, x, y); // outline + glow
+  ctx.strokeText(text, x, y); // second pass makes the glow stronger
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, x, y); // white core on top
+  ctx.restore();
+}
+
 function drawColorSlices(cx, cy, radius, count, names) {
   const sliceAngle = (Math.PI * 2) / count;
   ctx.save();
@@ -574,14 +594,14 @@ function drawColorSlices(cx, cy, radius, count, names) {
       ctx.rotate(start + sliceAngle / 2);
       ctx.textAlign = 'right';
       const isSub = state.subNames.has(names[i]);
-      ctx.fillStyle = isSub ? getSubNeonColor() : '#fff';
-      ctx.font = `${Math.round(21 * state.wheelFontScale)}px Segoe UI`;
+      const fontSize = Math.round(21 * state.wheelFontScale);
+      ctx.font = `${fontSize}px Segoe UI`;
       if (isSub) {
-        ctx.shadowColor = getSubNeonColor();
-        ctx.shadowBlur = 10;
+        drawSubNeonText(names[i], radius - 10, 4, fontSize);
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.fillText(names[i], radius - 10, 4);
       }
-      ctx.fillText(names[i], radius - 10, 4);
-      ctx.shadowBlur = 0;
       ctx.restore();
     }
   }
@@ -629,14 +649,14 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
 
     ctx.textAlign = 'right';
     const nameIsSub = state.subNames.has(name);
-    ctx.fillStyle = nameIsSub ? getSubNeonColor() : '#fff';
-    ctx.font = `${Math.round(20 * state.wheelFontScale)}px Segoe UI`;
+    const fontSize = Math.round(20 * state.wheelFontScale);
+    ctx.font = `${fontSize}px Segoe UI`;
     if (nameIsSub) {
-      ctx.shadowColor = getSubNeonColor();
-      ctx.shadowBlur = 10;
+      drawSubNeonText(name, radius - 8, radius * 0.25, fontSize);
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.fillText(name, radius - 8, radius * 0.25);
     }
-    ctx.fillText(name, radius - 8, radius * 0.25);
-    ctx.shadowBlur = 0;
     ctx.restore();
   }
   ctx.restore();
