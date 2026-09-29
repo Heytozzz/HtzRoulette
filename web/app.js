@@ -6,6 +6,7 @@
 const state = {
   participants: [],
   spinning: false,
+  animating: false,
   rotation: 0,
   eliminatedLog: [],
   winnersLog: [],
@@ -141,6 +142,12 @@ const els = {
   saveThemeBtn: document.getElementById('saveThemeBtn'),
   debugModeCheckbox: document.getElementById('debugModeCheckbox'),
   overlayStatusText: document.getElementById('overlayStatusText'),
+  cmdStatusText: document.getElementById('cmdStatusText'),
+  cmdPrefixInput: document.getElementById('cmdPrefixInput'),
+  modCmdEnabled: document.getElementById('modCmdEnabled'),
+  modCmdAllowMods: document.getElementById('modCmdAllowMods'),
+  modCmdWhitelist: document.getElementById('modCmdWhitelist'),
+  savedListsContainer: document.getElementById('savedListsContainer'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -349,7 +356,7 @@ function removeParticipantByName(name) {
 // Twitch chat join: one entry per person, plus sub bonus extras applied at once
 function addParticipant(username, subTier) {
   if (!username) return;
-  if (state.participants.includes(username)) return;
+  if (hasParticipant(username)) return;
   if (subTier > 0) state.subNames.add(username);
   const settings = getSettings();
   let copies = 1;
@@ -741,6 +748,7 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
   let watchdog = null;
 
   scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle });
+  state.animating = true;
 
   function step() {
     if (finished) return;
@@ -752,6 +760,7 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
 
     if (progress >= 1) {
       finished = true;
+      state.animating = false;
       bgTimers.clear(watchdog);
       onDone();
     }
@@ -968,6 +977,309 @@ function getSubTierFromTags(tags) {
   return 1;
 }
 
+// --- Chat commands: "<prefix> <command> [args]" (default prefix "!htz") ---
+// User commands: join, leave. Mod commands (off by default): add, kick, spin,
+// reset, open, close, mode, arrows, save, load. Each has a Spanish alias.
+const DEFAULT_CMD_PREFIX = '!htz';
+const SAVED_LISTS_KEY = 'htz_saved_lists';
+const normCmd = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+const CMD_ALIASES = {
+  join: ['join', 'unirse', 'entrar'],
+  leave: ['leave', 'salir'],
+  add: ['add', 'anadir', 'agregar'],
+  kick: ['kick', 'expulsar', 'sacar'],
+  spin: ['spin', 'girar'],
+  reset: ['reset', 'reiniciar'],
+  open: ['open', 'abrir'],
+  close: ['close', 'cerrar'],
+  mode: ['mode', 'modo'],
+  arrows: ['arrows', 'flechas'],
+  save: ['save', 'guardar'],
+  load: ['load', 'cargar'],
+};
+const CMD_LOOKUP = new Map();
+Object.entries(CMD_ALIASES).forEach(([name, aliases]) => {
+  aliases.forEach((alias) => CMD_LOOKUP.set(alias, name));
+});
+
+// normal / multiple = "Ganadores múltiples" / deathmatch = "Eliminatoria"
+const MODE_ALIASES = {
+  normal: ['normal'],
+  winners: ['multiple', 'multiples', 'ganadores', 'winners'],
+  elimination: ['deathmatch', 'eliminatoria', 'eliminacion', 'elimination'],
+};
+const CMDS_BLOCKED_WHILE_SPINNING = new Set(['add', 'kick', 'reset', 'mode', 'arrows', 'load']);
+const TWITCH_NAME_RE = /^[A-Za-z0-9_]{1,25}$/;
+
+function hasParticipant(name) {
+  const lower = name.toLowerCase();
+  return state.participants.some((n) => n.toLowerCase() === lower);
+}
+
+function removeAllByName(name) {
+  const lower = name.toLowerCase();
+  if (!hasParticipant(name)) return false;
+  state.participants = state.participants.filter((n) => n.toLowerCase() !== lower);
+  [...state.subNames].forEach((n) => { if (n.toLowerCase() === lower) state.subNames.delete(n); });
+  renderParticipants();
+  drawWheel();
+  return true;
+}
+
+function setJoinAccepted(open) {
+  state.joinAccepted = open;
+  els.startJoinBtn.disabled = open;
+  els.stopJoinBtn.disabled = !open;
+  els.joinStatusText.textContent = t(open ? 'joinOpen' : 'joinStopped');
+}
+
+let cmdStatusTimer = null;
+function setCmdStatus(message) {
+  els.cmdStatusText.textContent = message;
+  clearTimeout(cmdStatusTimer);
+  cmdStatusTimer = setTimeout(() => { els.cmdStatusText.textContent = ''; }, 10000);
+}
+
+function setControl(el, value) {
+  el.value = value;
+  el.dispatchEvent(new Event('input'));
+  el.dispatchEvent(new Event('change'));
+}
+
+// Saved lists (participants + which names are subs), kept in this browser
+function loadSavedLists() {
+  try {
+    return JSON.parse(localStorage.getItem(SAVED_LISTS_KEY)) || {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function storeSavedLists(lists) {
+  try {
+    localStorage.setItem(SAVED_LISTS_KEY, JSON.stringify(lists));
+  } catch (err) {
+    // Storage may be unavailable; ignore
+  }
+}
+
+function findSavedListKey(lists, name) {
+  const lower = name.toLowerCase();
+  return Object.keys(lists).find((k) => k.toLowerCase() === lower);
+}
+
+function renderSavedLists() {
+  if (!els.savedListsContainer) return;
+  const lists = loadSavedLists();
+  const names = Object.keys(lists);
+  els.savedListsContainer.innerHTML = '';
+  if (names.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'modal-note';
+    p.textContent = t('savedListsEmpty');
+    els.savedListsContainer.appendChild(p);
+    return;
+  }
+  names.forEach((name) => {
+    const row = document.createElement('div');
+    row.className = 'saved-list-row';
+    const label = document.createElement('span');
+    label.textContent = `${name} (${lists[name].participants.length})`;
+    const del = document.createElement('button');
+    del.textContent = t('deleteBtn');
+    del.addEventListener('click', () => {
+      const current = loadSavedLists();
+      delete current[name];
+      storeSavedLists(current);
+      renderSavedLists();
+    });
+    row.append(label, del);
+    els.savedListsContainer.appendChild(row);
+  });
+}
+
+function getCmdWhitelist() {
+  return new Set(
+    els.modCmdWhitelist.value.split(/[\s,;]+/).map((n) => n.replace(/^@/, '').toLowerCase()).filter(Boolean),
+  );
+}
+
+// Master switch must be on. Then: broadcaster always, mods if allowed, or whitelisted users.
+function isModAuthorized({ tags, login, displayName }) {
+  if (!els.modCmdEnabled.checked) return false;
+  const badges = tags.badges || '';
+  if (/(^|,)broadcaster\//.test(badges)) return true;
+  const isMod = tags.mod === '1' || /(^|,)moderator\//.test(badges);
+  if (els.modCmdAllowMods.checked && isMod) return true;
+  const whitelist = getCmdWhitelist();
+  return whitelist.has(login) || whitelist.has(displayName.toLowerCase());
+}
+
+function parseChatCommand(text) {
+  const prefix = els.cmdPrefixInput.value.trim() || DEFAULT_CMD_PREFIX;
+  const prefixTokens = prefix.split(/\s+/).map(normCmd);
+  const tokens = text.split(/\s+/);
+  if (tokens.length <= prefixTokens.length) return null;
+  for (let i = 0; i < prefixTokens.length; i += 1) {
+    if (normCmd(tokens[i]) !== prefixTokens[i]) return null;
+  }
+  const name = CMD_LOOKUP.get(normCmd(tokens[prefixTokens.length]));
+  if (!name) return null;
+  return { name, args: tokens.slice(prefixTokens.length + 1) };
+}
+
+function handleJoin(name, subTier) {
+  if (!state.joinAccepted) return;
+  if (els.subsOnlyCheckbox.checked && !(subTier > 0)) return;
+  addParticipant(name, subTier);
+}
+
+function parseListName(args) {
+  const rest = [...args];
+  if (rest.length && ['list', 'lista'].includes(normCmd(rest[0]))) rest.shift();
+  return rest.join(' ').trim().slice(0, 40);
+}
+
+// Returns a feedback message (shown in the header) or '' for none
+function runModCommand({ name, args }) {
+  if (state.animating && CMDS_BLOCKED_WHILE_SPINNING.has(name)) return t('cmdBusy');
+
+  switch (name) {
+    case 'add': {
+      if (!args.length) return t('cmdMissingArg');
+      const added = [];
+      const existing = [];
+      const invalid = [];
+      args.forEach((raw) => {
+        const user = raw.replace(/^@/, '');
+        if (!TWITCH_NAME_RE.test(user)) invalid.push(raw);
+        else if (hasParticipant(user)) existing.push(user);
+        else { addParticipant(user, 0); added.push(user); }
+      });
+      const parts = [];
+      if (added.length) parts.push(t('cmdAdded', { names: added.join(', ') }));
+      if (existing.length) parts.push(t('cmdAlready', { names: existing.join(', ') }));
+      if (invalid.length) parts.push(t('cmdInvalidName', { name: invalid.join(', ') }));
+      return parts.join(' · ');
+    }
+    case 'kick': {
+      if (!args.length) return t('cmdMissingArg');
+      const kicked = [];
+      const missing = [];
+      args.forEach((raw) => {
+        const user = raw.replace(/^@/, '');
+        if (removeAllByName(user)) kicked.push(user);
+        else missing.push(user);
+      });
+      const parts = [];
+      if (kicked.length) parts.push(t('cmdKicked', { names: kicked.join(', ') }));
+      if (missing.length) parts.push(t('cmdNotFound', { name: missing.join(', ') }));
+      return parts.join(' · ');
+    }
+    case 'spin':
+      if (state.spinning) return t('cmdCannotSpin');
+      if (state.participants.length === 0) return t('cmdNoParticipants');
+      spin();
+      return t('cmdSpinning');
+    case 'reset':
+      resetParticipants();
+      return t('cmdResetDone');
+    case 'open':
+      setJoinAccepted(true);
+      return t('cmdOpened');
+    case 'close':
+      setJoinAccepted(false);
+      return t('cmdClosed');
+    case 'mode': {
+      const key = args[0] ? normCmd(args[0]) : '';
+      const target = Object.keys(MODE_ALIASES).find((m) => MODE_ALIASES[m].includes(key));
+      if (!target) return t('cmdModeInvalid');
+      setControl(els.modeSelect, target);
+      return t('cmdModeSet', { mode: els.modeSelect.selectedOptions[0].textContent });
+    }
+    case 'arrows': {
+      const mode = els.modeSelect.value;
+      if (mode === 'normal') return t('cmdArrowsNotApplicable');
+      const min = mode === 'winners' ? 2 : 1;
+      const max = 8;
+      const n = /^\d+$/.test(args[0] || '') ? Number(args[0]) : NaN;
+      if (!(n >= min && n <= max)) return t('cmdArrowsInvalid', { min, max });
+      if (mode === 'elimination') {
+        setControl(els.eliminationSubMode, n >= 2 ? 'multiple' : 'simple');
+        if (n >= 2) setControl(els.eliminationArrowCount, n);
+      } else {
+        setControl(els.winnersSubMode, 'simultaneous');
+        setControl(els.winnersCountInput, n);
+      }
+      return t('cmdArrowsSet', { n });
+    }
+    case 'save': {
+      const listName = parseListName(args);
+      if (!listName) return t('cmdListNameMissing');
+      if (state.participants.length === 0) return t('cmdListEmpty');
+      const lists = loadSavedLists();
+      const existingKey = findSavedListKey(lists, listName);
+      if (existingKey) delete lists[existingKey];
+      lists[listName] = {
+        participants: [...state.participants],
+        subNames: [...state.subNames],
+        savedAt: Date.now(),
+      };
+      storeSavedLists(lists);
+      renderSavedLists();
+      return t('cmdListSaved', { name: listName, n: state.participants.length });
+    }
+    case 'load': {
+      const listName = parseListName(args);
+      if (!listName) return t('cmdListNameMissing');
+      const lists = loadSavedLists();
+      const key = findSavedListKey(lists, listName);
+      if (!key) return t('cmdListNotFound', { name: listName });
+      resetParticipants();
+      state.participants = [...lists[key].participants];
+      state.subNames = new Set(lists[key].subNames || []);
+      renderParticipants();
+      drawWheel();
+      return t('cmdListLoaded', { name: key, n: state.participants.length });
+    }
+    default:
+      return '';
+  }
+}
+
+function handleChatMessage(parsed) {
+  // Twitch appends an invisible character to repeated messages; strip it and zero-width chars
+  const text = parsed.message.replace(/[\u{E0000}-\u{E007F}\u200B-\u200D\uFEFF]/gu, '').trim();
+  if (!text) return;
+  const login = parsed.prefix.split('!')[0].toLowerCase();
+  const who = {
+    tags: parsed.tags,
+    login,
+    displayName: parsed.tags['display-name'] || login,
+    subTier: getSubTierFromTags(parsed.tags),
+  };
+
+  // Classic join command from the header (e.g. "!join")
+  if (text.toLowerCase() === state.joinCommand) {
+    handleJoin(who.displayName, who.subTier);
+    return;
+  }
+
+  const cmd = parseChatCommand(text);
+  if (!cmd) return;
+
+  if (cmd.name === 'join') { handleJoin(who.displayName, who.subTier); return; }
+  if (cmd.name === 'leave') {
+    if (!state.animating) removeAllByName(who.displayName);
+    return;
+  }
+
+  if (!isModAuthorized(who)) return;
+  const message = runModCommand(cmd);
+  if (message) setCmdStatus(`@${who.displayName}: ${message}`);
+}
+
 function connectTwitch(channel) {
   return new Promise((resolve) => {
     const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
@@ -1003,15 +1315,7 @@ function connectTwitch(channel) {
           resolve({ ok: false, error: parsed.message || 'connection refused' });
         }
 
-        if (parsed.command === 'PRIVMSG') {
-          if (!state.joinAccepted) return;
-          if (parsed.message.trim().toLowerCase() === state.joinCommand) {
-            const subTier = getSubTierFromTags(parsed.tags);
-            if (els.subsOnlyCheckbox.checked && !(subTier > 0)) return;
-            const username = parsed.tags['display-name'] || (parsed.prefix.split('!')[0]);
-            addParticipant(username, subTier);
-          }
-        }
+        if (parsed.command === 'PRIVMSG') handleChatMessage(parsed);
       });
     };
 
@@ -1074,19 +1378,8 @@ els.joinCommandInput.addEventListener('change', () => {
   state.joinCommand = els.joinCommandInput.value.trim().toLowerCase() || '!join';
 });
 
-els.startJoinBtn.addEventListener('click', () => {
-  state.joinAccepted = true;
-  els.startJoinBtn.disabled = true;
-  els.stopJoinBtn.disabled = false;
-  els.joinStatusText.textContent = t('joinOpen');
-});
-
-els.stopJoinBtn.addEventListener('click', () => {
-  state.joinAccepted = false;
-  els.startJoinBtn.disabled = false;
-  els.stopJoinBtn.disabled = true;
-  els.joinStatusText.textContent = t('joinStopped');
-});
+els.startJoinBtn.addEventListener('click', () => setJoinAccepted(true));
+els.stopJoinBtn.addEventListener('click', () => setJoinAccepted(false));
 
 els.wheelBox.addEventListener('click', (e) => {
   if (e.target.closest('.eliminated-panel')) return;
@@ -1426,6 +1719,10 @@ function saveState() {
       rouletteImageMode: state.rouletteImageMode,
       joinCommand: els.joinCommandInput.value,
       subsOnly: els.subsOnlyCheckbox.checked,
+      cmdPrefix: els.cmdPrefixInput.value,
+      modCmdEnabled: els.modCmdEnabled.checked,
+      modCmdAllowMods: els.modCmdAllowMods.checked,
+      modCmdWhitelist: els.modCmdWhitelist.value,
     };
     localStorage.setItem(SAVED_STATE_KEY, JSON.stringify(data));
   } catch (err) {
@@ -1489,6 +1786,10 @@ async function applySavedState() {
     state.joinCommand = data.joinCommand.trim().toLowerCase() || '!join';
   }
   els.subsOnlyCheckbox.checked = !!data.subsOnly;
+  if (data.cmdPrefix != null) els.cmdPrefixInput.value = data.cmdPrefix;
+  els.modCmdEnabled.checked = !!data.modCmdEnabled;
+  if (data.modCmdAllowMods != null) els.modCmdAllowMods.checked = !!data.modCmdAllowMods;
+  if (data.modCmdWhitelist != null) els.modCmdWhitelist.value = data.modCmdWhitelist;
 
   if (data.theme) {
     els.themeSelect.value = data.theme;
@@ -1501,7 +1802,7 @@ async function applySavedState() {
   els.eliminationFinalWinnersCount, els.winnersSubMode, els.winnersCountInput, els.autoModeCheckbox,
   els.autoWaitInput, els.subBonusCheckbox, els.subExtraTier1, els.subExtraTier2, els.subExtraTier3,
   els.colorPaletteSelect, els.wheelScaleSlider, els.wheelFontSizeSlider, els.rouletteImageModeSelect, els.joinCommandInput,
-  els.subsOnlyCheckbox,
+  els.subsOnlyCheckbox, els.cmdPrefixInput, els.modCmdEnabled, els.modCmdAllowMods, els.modCmdWhitelist,
 ].forEach((el) => el.addEventListener('change', saveState));
 
 // --- Debug mode: temporary drag-to-reorder for layout tuning (flex `order`,
@@ -1856,6 +2157,7 @@ loadStrings().then(async () => {
     loadTwitchCredentials();
     await refreshThemeSelect();
     await applySavedState();
+    renderSavedLists();
   }
   renderParticipants();
   renderLogs();

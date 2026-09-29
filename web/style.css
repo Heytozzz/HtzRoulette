@@ -559,3 +559,8 @@ body.overlay-eliminated #overlayRoot { align-items: flex-start; }
 #overlayRoot #modeStatus { color: #fff; text-shadow: 0 0 4px #000; margin-top: 6px; }
 .overlay-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 .overlay-row input { flex: 1; min-width: 0; }
+
+/* Chat commands */
+.cmd-status { font-size: 12px; opacity: 0.85; margin-left: 8px; }
+#modCmdWhitelist { width: 100%; box-sizing: border-box; }
+.saved-list-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }

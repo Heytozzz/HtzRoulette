@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
   <header>
@@ -29,6 +29,7 @@
         <input id="subsOnlyCheckbox" type="checkbox" />
         <span data-i18n="subsOnlyLabel">Solo suscriptores</span>
       </label>
+      <span id="cmdStatusText" class="cmd-status"></span>
     </div>
   </header>
 
@@ -199,6 +200,23 @@
       <button id="saveThemeBtn" data-i18n="saveThemeBtn">Guardar tema</button>
       <p class="modal-note" data-i18n="themeSavedNote">Los temas se guardan en este navegador (no se suben a ningún servidor).</p>
 
+      <h3 data-i18n="cmdSettingsTitle">Comandos de chat</h3>
+      <label data-i18n="cmdPrefixLabel">Prefijo de comandos</label>
+      <input id="cmdPrefixInput" type="text" value="!htz" />
+      <label class="inline-label">
+        <input id="modCmdEnabled" type="checkbox" />
+        <span data-i18n="modCmdEnabledLabel">Activar comandos de mod</span>
+      </label>
+      <label class="inline-label">
+        <input id="modCmdAllowMods" type="checkbox" checked />
+        <span data-i18n="modCmdAllowModsLabel">Permitir a los moderadores</span>
+      </label>
+      <label data-i18n="modCmdWhitelistLabel">Whitelist (usuarios autorizados)</label>
+      <textarea id="modCmdWhitelist" rows="3" data-i18n-placeholder="modCmdWhitelistPlaceholder" placeholder="Un usuario por línea"></textarea>
+      <p class="modal-note" data-i18n="cmdHelpNote">Comandos.</p>
+      <label data-i18n="savedListsTitle">Listas guardadas</label>
+      <div id="savedListsContainer"></div>
+
       <h3 data-i18n="overlaysTitle">Overlays para OBS</h3>
       <p class="modal-note" data-i18n="overlaysNote">Añade cada link como "Fuente de navegador" en OBS. Esta página debe seguir abierta para que los overlays se actualicen.</p>
       <label data-i18n="overlayWheelLabel">Ruleta + mensajes de ganador/eliminado</label>
@@ -219,6 +237,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
