@@ -182,5 +182,6 @@
   "soundPreviewTitle": "Probar sonidos",
   "soundPreviewTick": "Giro",
   "soundPreviewSelect": "Selección",
-  "soundPreviewFinal": "Ganador final"
+  "soundPreviewFinal": "Ganador final",
+  "fxGradient": "Degradado"
 }

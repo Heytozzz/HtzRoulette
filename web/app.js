@@ -4,7 +4,7 @@
 // stored in this browser's IndexedDB (there's no filesystem to read from).
 
 // Sub text customization (crown/icon, animated effects, font styles)
-const SUB_EFFECT_KEYS = ['bounce', 'wave', 'blink', 'glitch', 'rainbow'];
+const SUB_EFFECT_KEYS = ['bounce', 'wave', 'blink', 'glitch', 'rainbow', 'gradient'];
 const SUB_STYLE_KEYS = ['bold', 'italic', 'underline', 'strike', 'uppercase'];
 const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
@@ -21,7 +21,7 @@ const state = {
   subColors: { fill: null, stroke: null, glow: null },
   subCrown: 'none', // 'none' | 'crown' (gold ♕) | 'icon' (channel sub badge image)
   subBadgeUrl: null,
-  subEffects: { bounce: false, wave: false, blink: false, glitch: false, rainbow: false },
+  subEffects: { bounce: false, wave: false, blink: false, glitch: false, rainbow: false, gradient: false },
   subStyles: { bold: false, italic: false, underline: false, strike: false, uppercase: false },
   userShadow: { enabled: false, color: '#000000' },
   soundPack: 'original', // key of SOUND_PACKS
@@ -653,6 +653,24 @@ function clipToWheelDisc(radius) {
   ctx.clip();
 }
 
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function mixRgb(a, b, amount) {
+  return a.map((v, i) => Math.round(v + (b[i] - v) * amount));
+}
+
+// Animated-gradient color built from the theme's own color: p in 0..1 goes
+// from a light tint of the theme color to white. It never goes darker than the
+// tint, so the fill always contrasts with the theme-colored outline and glow.
+function themeGradientColor(p) {
+  const base = hexToRgb(getSubNeonColor());
+  const rgb = mixRgb(base, [255, 255, 255], 0.3 + 0.7 * p);
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
 function pseudoRandom(n) {
   const v = Math.sin(n * 127.1) * 43758.5453;
   return v - Math.floor(v);
@@ -704,11 +722,17 @@ function drawSubText(name, x, y, fontSize, slot) {
   const textX = startX + badgeW;
 
   const chars = [...text];
-  const perChar = fx.wave || fx.rainbow;
+  const perChar = fx.wave || fx.rainbow || fx.gradient;
   const charX = perChar ? chars.map((_, i) => ctx.measureText(chars.slice(0, i).join('')).width) : null;
   const waveY = (i) => (fx.wave ? Math.sin(time * 4 + i * 0.7 + phase) * fontSize * 0.2 : 0);
   const rainbow = (i) => `hsl(${Math.floor((time * 140 + i * 35 + phase * 40) % 360)}, 100%, 60%)`;
-  const fillColor = (i) => (fx.rainbow ? rainbow(i) : getSubFillColor());
+  // Gradient: a band of light flowing through the letters, in the theme's color
+  const gradient = (i) => themeGradientColor(0.5 + 0.5 * Math.sin(time * 2.4 - i * 0.55 + phase));
+  const fillColor = (i) => {
+    if (fx.rainbow) return rainbow(i); // rainbow wins if both are on
+    if (fx.gradient) return gradient(i);
+    return getSubFillColor();
+  };
 
   const baseY = y + (fx.bounce ? -Math.abs(Math.sin(time * 5 + phase)) * fontSize * 0.4 : 0);
   ctx.globalAlpha = fx.blink && Math.sin(time * 6 + phase) <= -0.2 ? 0.15 : 1;
