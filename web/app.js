@@ -12,6 +12,8 @@ const state = {
   winnersLog: [],
   autoTimer: null,
   colorPalette: 'red',
+  // Sub text colors on the wheel; null = default (fill: white, stroke/glow: theme color)
+  subColors: { fill: null, stroke: null, glow: null },
   wheelFontScale: 1,
   subNames: new Set(),
   joinAccepted: false,
@@ -148,6 +150,15 @@ const els = {
   modCmdAllowMods: document.getElementById('modCmdAllowMods'),
   modCmdWhitelist: document.getElementById('modCmdWhitelist'),
   savedListsContainer: document.getElementById('savedListsContainer'),
+  subFillColor: document.getElementById('subFillColor'),
+  subFillReset: document.getElementById('subFillReset'),
+  subFillHint: document.getElementById('subFillHint'),
+  subStrokeColor: document.getElementById('subStrokeColor'),
+  subStrokeReset: document.getElementById('subStrokeReset'),
+  subStrokeHint: document.getElementById('subStrokeHint'),
+  subGlowColor: document.getElementById('subGlowColor'),
+  subGlowReset: document.getElementById('subGlowReset'),
+  subGlowHint: document.getElementById('subGlowHint'),
 };
 
 const ctx = els.wheelCanvas.getContext('2d');
@@ -553,36 +564,22 @@ function drawWheel() {
   drawPointers(cx, cy, radius);
 }
 
-// Sub names on the wheel. Layers from the center outwards:
-// white text -> gold stroke -> thin black stroke -> gold glow.
-// They are painted from the outside in, so each one covers the inner half of
-// the one below it.
+// Sub names on the wheel: white-by-default fill, an outline and a glow, each
+// with its own color (outline and glow follow the theme unless customized).
 function drawSubNeonText(text, x, y, fontSize) {
-  const gold = getSubNeonColor();
-  const goldWidth = Math.max(3, fontSize * 0.2);
-  const blackVisible = Math.max(1.25, fontSize * 0.07);
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.miterLimit = 2;
-
-  // Outer layer: black stroke whose shadow is the gold glow
-  ctx.lineWidth = goldWidth + blackVisible * 2;
-  ctx.strokeStyle = '#000';
-  ctx.shadowColor = gold;
+  ctx.lineWidth = Math.max(3, fontSize * 0.2);
+  ctx.strokeStyle = getSubStrokeColor();
+  ctx.shadowColor = getSubGlowColor();
   ctx.shadowBlur = Math.max(10, fontSize * 0.6);
-  ctx.strokeText(text, x, y);
+  ctx.strokeText(text, x, y); // outline + glow
   ctx.strokeText(text, x, y); // second pass makes the glow stronger
-
-  // Gold stroke on top of it (no shadow)
   ctx.shadowBlur = 0;
   ctx.shadowColor = 'transparent';
-  ctx.lineWidth = goldWidth;
-  ctx.strokeStyle = gold;
-  ctx.strokeText(text, x, y);
-
-  // White core
-  ctx.fillStyle = '#fff';
-  ctx.fillText(text, x, y);
+  ctx.fillStyle = getSubFillColor();
+  ctx.fillText(text, x, y); // fill on top
   ctx.restore();
 }
 
@@ -1471,17 +1468,65 @@ const THEME_ACCENT_COLORS = {
   rainbow: ['#6441a5', '#7d5bbe'],
 };
 
-// Sub names on the wheel always glow gold, whatever the theme palette is
-const SUB_NEON_COLOR = '#ffd700';
+const SUB_NEON_COLORS = {
+  red: '#ff3b3b',
+  blue: '#3bb0ff',
+  green: '#39ff6a',
+  purple: '#c23bff',
+  gray: '#e8e8e8',
+  rainbow: '#ffd700',
+};
+const SUB_FILL_DEFAULT = '#ffffff';
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 function getSubNeonColor() {
-  return SUB_NEON_COLOR;
+  return SUB_NEON_COLORS[state.colorPalette] || SUB_NEON_COLORS.red;
 }
+function getSubFillColor() {
+  return state.subColors.fill || SUB_FILL_DEFAULT;
+}
+function getSubStrokeColor() {
+  return state.subColors.stroke || getSubNeonColor();
+}
+function getSubGlowColor() {
+  return state.subColors.glow || getSubNeonColor();
+}
+
+// Color pickers show the effective color; outline/glow are marked while they follow the theme
+const SUB_COLOR_FIELDS = [
+  { key: 'fill', input: 'subFillColor', reset: 'subFillReset', hint: 'subFillHint' },
+  { key: 'stroke', input: 'subStrokeColor', reset: 'subStrokeReset', hint: 'subStrokeHint' },
+  { key: 'glow', input: 'subGlowColor', reset: 'subGlowReset', hint: 'subGlowHint' },
+];
+
+function refreshSubColorInputs() {
+  const effective = { fill: getSubFillColor(), stroke: getSubStrokeColor(), glow: getSubGlowColor() };
+  SUB_COLOR_FIELDS.forEach(({ key, input, hint }) => {
+    els[input].value = effective[key];
+    els[hint].textContent = key !== 'fill' && !state.subColors[key] ? t('followsTheme') : '';
+  });
+}
+
+SUB_COLOR_FIELDS.forEach(({ key, input, reset }) => {
+  els[input].addEventListener('input', () => {
+    state.subColors[key] = els[input].value;
+    refreshSubColorInputs();
+    drawWheel();
+    saveState();
+  });
+  els[reset].addEventListener('click', () => {
+    state.subColors[key] = null;
+    refreshSubColorInputs();
+    drawWheel();
+    saveState();
+  });
+});
 
 function applyThemeAccent(palette) {
   const [accent, hover] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
   document.documentElement.style.setProperty('--theme-accent', accent);
   document.documentElement.style.setProperty('--theme-accent-hover', hover);
+  refreshSubColorInputs();
 }
 
 els.colorPaletteSelect.addEventListener('change', () => {
@@ -1755,6 +1800,7 @@ function saveState() {
       subExtraTier2: els.subExtraTier2.value,
       subExtraTier3: els.subExtraTier3.value,
       colorPalette: state.colorPalette,
+      subColors: state.subColors,
       wheelScale: els.wheelScaleSlider.value,
       wheelFontSize: els.wheelFontSizeSlider.value,
       theme: els.themeSelect.value,
@@ -1810,6 +1856,13 @@ async function applySavedState() {
     state.colorPalette = data.colorPalette;
     els.colorPaletteSelect.value = data.colorPalette;
     applyThemeAccent(data.colorPalette);
+  }
+  if (data.subColors) {
+    ['fill', 'stroke', 'glow'].forEach((k) => {
+      const v = data.subColors[k];
+      state.subColors[k] = typeof v === 'string' && HEX_COLOR_RE.test(v) ? v : null;
+    });
+    refreshSubColorInputs();
   }
   if (data.wheelScale != null) {
     els.wheelScaleSlider.value = data.wheelScale;
@@ -1963,6 +2016,7 @@ function overlaySnapshot() {
     winnersLog: state.winnersLog,
     rotation: state.rotation,
     colorPalette: state.colorPalette,
+    subColors: state.subColors,
     wheelFontScale: state.wheelFontScale,
     wheelScale: els.wheelScaleSlider.value,
     rouletteImageMode: state.rouletteImageMode,
@@ -2108,6 +2162,7 @@ function applyOverlayState(m, keepRotation) {
   state.winnersLog = m.winnersLog;
   if (!keepRotation) state.rotation = m.rotation;
   state.colorPalette = m.colorPalette;
+  if (m.subColors) state.subColors = m.subColors;
   state.wheelFontScale = m.wheelFontScale;
   state.rouletteImageMode = m.rouletteImageMode;
   Object.entries(m.settings).forEach(([k, v]) => { els[k].value = v; });

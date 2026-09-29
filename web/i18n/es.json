@@ -132,5 +132,11 @@
   "cmdListLoaded": "Lista «{name}» cargada ({n})",
   "cmdListNotFound": "No existe la lista «{name}»",
   "tabCommands": "Comandos",
-  "tabOverlays": "Overlays"
+  "tabOverlays": "Overlays",
+  "subTextTitle": "Texto de subs en la ruleta",
+  "subFillLabel": "Relleno",
+  "subStrokeLabel": "Contorno",
+  "subGlowLabel": "Glow",
+  "resetColorBtn": "Restablecer",
+  "followsTheme": "(color del tema)"
 }
