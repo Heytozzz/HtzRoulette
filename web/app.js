@@ -3,6 +3,11 @@
 // dependency — its browser CDN bundle is unreliable). Themes/images are
 // stored in this browser's IndexedDB (there's no filesystem to read from).
 
+// Sub text customization (crown/icon, animated effects, font styles)
+const SUB_EFFECT_KEYS = ['bounce', 'wave', 'blink', 'glitch', 'rainbow'];
+const SUB_STYLE_KEYS = ['bold', 'italic', 'underline', 'strike', 'uppercase'];
+const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+
 const state = {
   participants: [],
   spinning: false,
@@ -14,6 +19,11 @@ const state = {
   colorPalette: 'red',
   // Sub text colors on the wheel; null = default (fill: white, stroke/glow: theme color)
   subColors: { fill: null, stroke: null, glow: null },
+  subCrown: 'none', // 'none' | 'crown' (gold ♕) | 'icon' (channel sub badge image)
+  subBadgeUrl: null,
+  subEffects: { bounce: false, wave: false, blink: false, glitch: false, rainbow: false },
+  subStyles: { bold: false, italic: false, underline: false, strike: false, uppercase: false },
+  userShadow: { enabled: false, color: '#000000' },
   wheelFontScale: 1,
   subNames: new Set(),
   joinAccepted: false,
@@ -159,7 +169,21 @@ const els = {
   subGlowColor: document.getElementById('subGlowColor'),
   subGlowReset: document.getElementById('subGlowReset'),
   subGlowHint: document.getElementById('subGlowHint'),
+  subCrownSelect: document.getElementById('subCrownSelect'),
+  subBadgeFile: document.getElementById('subBadgeFile'),
+  subBadgeTwitchBtn: document.getElementById('subBadgeTwitchBtn'),
+  subBadgeClearBtn: document.getElementById('subBadgeClearBtn'),
+  subBadgePreview: document.getElementById('subBadgePreview'),
+  subBadgeStatus: document.getElementById('subBadgeStatus'),
+  userShadowCheckbox: document.getElementById('userShadowCheckbox'),
+  userShadowColor: document.getElementById('userShadowColor'),
 };
+SUB_EFFECT_KEYS.forEach((k) => {
+  els[`subFx${capitalize(k)}`] = document.getElementById(`subFx${capitalize(k)}`);
+});
+SUB_STYLE_KEYS.forEach((k) => {
+  els[`subStyle${capitalize(k)}`] = document.getElementById(`subStyle${capitalize(k)}`);
+});
 
 const ctx = els.wheelCanvas.getContext('2d');
 const PALETTE_HUES = { red: 0, blue: 210, green: 120, purple: 275, gray: 0 };
@@ -287,6 +311,21 @@ function truncateName(name, max = 10) {
   return name.length > max ? `${name.slice(0, max)}...` : name;
 }
 
+function createSubBadgeElement() {
+  if (state.subCrown === 'none') return null;
+  if (state.subCrown === 'icon' && state.subBadgeUrl) {
+    const img = document.createElement('img');
+    img.className = 'sub-badge-img';
+    img.src = state.subBadgeUrl;
+    img.alt = '';
+    return img;
+  }
+  const crown = document.createElement('span');
+  crown.className = 'sub-crown';
+  crown.textContent = '\u2655';
+  return crown;
+}
+
 function renderParticipants() {
   els.participantList.innerHTML = '';
   if (state.participants.length === 0) {
@@ -314,7 +353,11 @@ function renderParticipants() {
     const nameSpan = document.createElement('span');
     nameSpan.textContent = truncateName(name);
     nameSpan.title = name;
-    if (state.subNames.has(name)) nameSpan.classList.add('sub-name');
+    if (state.subNames.has(name)) {
+      nameSpan.classList.add('sub-name');
+      const subBadge = createSubBadgeElement();
+      if (subBadge) nameWrap.appendChild(subBadge);
+    }
     nameWrap.appendChild(nameSpan);
 
     if (count > 1) {
@@ -562,25 +605,202 @@ function drawWheel() {
   }
 
   drawPointers(cx, cy, radius);
+  updateEffectsLoop();
 }
 
-// Sub names on the wheel: white-by-default fill, an outline and a glow, each
-// with its own color (outline and glow follow the theme unless customized).
-function drawSubNeonText(text, x, y, fontSize) {
+// Normal users' wheel text: white, with an optional drop shadow.
+// (Canvas shadow offsets are in screen space, so the "light" stays fixed while the wheel spins.)
+function drawUserText(text, x, y, fontSize) {
+  ctx.fillStyle = '#fff';
+  if (!state.userShadow.enabled) {
+    ctx.fillText(text, x, y);
+    return;
+  }
   ctx.save();
+  ctx.shadowColor = state.userShadow.color;
+  ctx.shadowBlur = Math.max(3, fontSize * 0.25);
+  ctx.shadowOffsetX = Math.max(1.5, fontSize * 0.1);
+  ctx.shadowOffsetY = Math.max(1.5, fontSize * 0.1);
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// The glow of sub names would otherwise spill past the edge of the wheel
+function clipToWheelDisc(radius) {
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.clip();
+}
+
+function pseudoRandom(n) {
+  const v = Math.sin(n * 127.1) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+function subFontString(fontSize) {
+  const st = state.subStyles;
+  return `${st.italic ? 'italic ' : ''}${st.bold ? 'bold ' : ''}${fontSize}px Segoe UI`;
+}
+
+// Sub names on the wheel: optional badge (gold crown or channel sub icon), then
+// the name with an outline + glow + fill (each with its own color), font
+// styles and animated effects. `slot` is the wheel position, used so the
+// effects are not all in sync.
+function drawSubText(name, x, y, fontSize, slot) {
+  const fx = state.subEffects;
+  const st = state.subStyles;
+  const text = st.uppercase ? name.toUpperCase() : name;
+  const time = performance.now() / 1000;
+  const phase = slot * 0.9;
+
+  ctx.save();
+  ctx.font = subFontString(fontSize);
+  ctx.textAlign = 'left';
   ctx.lineJoin = 'round';
   ctx.miterLimit = 2;
+
+  let badge = null;
+  if (state.subCrown === 'crown') {
+    badge = { kind: 'crown' };
+  } else if (state.subCrown === 'icon') {
+    const img = getLoadedImage(state.subBadgeUrl);
+    if (img) badge = { kind: 'image', img };
+    else if (!state.subBadgeUrl) badge = { kind: 'crown' }; // no icon configured: fall back to the crown
+  }
+  const gap = fontSize * 0.25;
+  const crownFont = `${Math.round(fontSize * 1.15)}px Segoe UI`;
+  let badgeSize = 0;
+  if (badge && badge.kind === 'image') {
+    badgeSize = fontSize * 1.15;
+  } else if (badge) {
+    ctx.font = crownFont;
+    badgeSize = ctx.measureText('\u2655').width;
+    ctx.font = subFontString(fontSize);
+  }
+  const badgeW = badge ? badgeSize + gap : 0;
+  const textW = ctx.measureText(text).width;
+  const startX = x - badgeW - textW;
+  const textX = startX + badgeW;
+
+  const chars = [...text];
+  const perChar = fx.wave || fx.rainbow;
+  const charX = perChar ? chars.map((_, i) => ctx.measureText(chars.slice(0, i).join('')).width) : null;
+  const waveY = (i) => (fx.wave ? Math.sin(time * 4 + i * 0.7 + phase) * fontSize * 0.2 : 0);
+  const rainbow = (i) => `hsl(${Math.floor((time * 140 + i * 35 + phase * 40) % 360)}, 100%, 60%)`;
+  const fillColor = (i) => (fx.rainbow ? rainbow(i) : getSubFillColor());
+
+  const baseY = y + (fx.bounce ? -Math.abs(Math.sin(time * 5 + phase)) * fontSize * 0.4 : 0);
+  ctx.globalAlpha = fx.blink && Math.sin(time * 6 + phase) <= -0.2 ? 0.15 : 1;
+
+  const strokeText = (ox, oy) => {
+    if (!perChar) ctx.strokeText(text, textX + ox, baseY + oy);
+    else chars.forEach((ch, i) => ctx.strokeText(ch, textX + ox + charX[i], baseY + oy + waveY(i)));
+  };
+  const fillText = (ox, oy, colorAt) => {
+    if (!perChar) {
+      ctx.fillStyle = colorAt(0);
+      ctx.fillText(text, textX + ox, baseY + oy);
+    } else {
+      chars.forEach((ch, i) => {
+        ctx.fillStyle = colorAt(i);
+        ctx.fillText(ch, textX + ox + charX[i], baseY + oy + waveY(i));
+      });
+    }
+  };
+
+  // Glitch: short bursts with cyan/magenta ghost copies and a small jitter
+  const glitching = fx.glitch && (time * 1000 + slot * 350) % 1700 < 220;
+  let mx = 0;
+  let my = 0;
+  let ghostDx = 0;
+  if (glitching) {
+    const seed = Math.floor(time * 30) + slot * 17;
+    const gx = (pseudoRandom(seed) - 0.5) * fontSize * 0.5;
+    const gy = (pseudoRandom(seed + 1) - 0.5) * fontSize * 0.15;
+    ghostDx = fontSize * 0.12 + Math.abs(gx) * 0.6;
+    mx = gx * 0.3;
+    my = gy;
+  }
+
+  // Outline + glow
   ctx.lineWidth = Math.max(3, fontSize * 0.2);
   ctx.strokeStyle = getSubStrokeColor();
   ctx.shadowColor = getSubGlowColor();
   ctx.shadowBlur = Math.max(10, fontSize * 0.6);
-  ctx.strokeText(text, x, y); // outline + glow
-  ctx.strokeText(text, x, y); // second pass makes the glow stronger
+  strokeText(mx, my);
+  strokeText(mx, my); // second pass makes the glow stronger
+
   ctx.shadowBlur = 0;
   ctx.shadowColor = 'transparent';
-  ctx.fillStyle = getSubFillColor();
-  ctx.fillText(text, x, y); // fill on top
+
+  // Glitch ghosts: cyan/magenta copies shifted sideways, between outline and fill
+  if (glitching) {
+    fillText(mx - ghostDx, my, () => '#00ffff');
+    fillText(mx + ghostDx, my - 1, () => '#ff00ff');
+  }
+
+  // Fill
+  fillText(mx, my, fillColor);
+
+  // Underline / strikethrough
+  if (st.underline || st.strike) {
+    ctx.fillStyle = fillColor(0);
+    ctx.shadowColor = getSubGlowColor();
+    ctx.shadowBlur = fontSize * 0.3;
+    const thick = Math.max(1.5, fontSize * 0.08);
+    if (st.underline) ctx.fillRect(textX + mx, baseY + my + fontSize * 0.16, textW, thick);
+    if (st.strike) ctx.fillRect(textX + mx, baseY + my - fontSize * 0.3, textW, thick);
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+  }
+
+  // Badge
+  if (badge) {
+    const bx = startX + mx;
+    const by = baseY + my + waveY(0);
+    if (badge.kind === 'crown') {
+      ctx.font = crownFont;
+      ctx.lineWidth = Math.max(2, fontSize * 0.14);
+      ctx.strokeStyle = getSubStrokeColor();
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = fontSize * 0.35;
+      ctx.strokeText('\u2655', bx, by);
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = '#ffd700';
+      ctx.fillText('\u2655', bx, by);
+    } else {
+      ctx.shadowColor = getSubGlowColor();
+      ctx.shadowBlur = fontSize * 0.3;
+      ctx.drawImage(badge.img, bx, by - fontSize * 0.3 - badgeSize / 2, badgeSize, badgeSize);
+    }
+  }
   ctx.restore();
+}
+
+// Redraw the wheel continuously while a sub effect is on (the spin loop already
+// redraws every frame while spinning). Throttled to save CPU.
+let effectsRaf = null;
+let lastEffectDraw = 0;
+
+function subEffectsActive() {
+  return SUB_EFFECT_KEYS.some((k) => state.subEffects[k])
+    && state.participants.some((n) => state.subNames.has(n));
+}
+
+function effectsTick(now) {
+  effectsRaf = null;
+  if (!subEffectsActive()) return;
+  const interval = state.participants.length > 40 ? 50 : 33;
+  if (!state.animating && now - lastEffectDraw >= interval) {
+    lastEffectDraw = now;
+    drawWheel();
+  }
+  if (effectsRaf === null) effectsRaf = requestAnimationFrame(effectsTick);
+}
+
+function updateEffectsLoop() {
+  if (effectsRaf === null && subEffectsActive()) effectsRaf = requestAnimationFrame(effectsTick);
 }
 
 function drawColorSlices(cx, cy, radius, count, names) {
@@ -607,10 +827,10 @@ function drawColorSlices(cx, cy, radius, count, names) {
       const fontSize = Math.round(21 * state.wheelFontScale);
       ctx.font = `${fontSize}px Segoe UI`;
       if (isSub) {
-        drawSubNeonText(names[i], radius - 10, 4, fontSize);
+        clipToWheelDisc(radius);
+        drawSubText(names[i], radius - 10, 4, fontSize, i);
       } else {
-        ctx.fillStyle = '#fff';
-        ctx.fillText(names[i], radius - 10, 4);
+        drawUserText(names[i], radius - 10, 4, fontSize);
       }
       ctx.restore();
     }
@@ -662,10 +882,10 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
     const fontSize = Math.round(20 * state.wheelFontScale);
     ctx.font = `${fontSize}px Segoe UI`;
     if (nameIsSub) {
-      drawSubNeonText(name, radius - 8, radius * 0.25, fontSize);
+      clipToWheelDisc(radius);
+      drawSubText(name, radius - 8, radius * 0.25, fontSize, i);
     } else {
-      ctx.fillStyle = '#fff';
-      ctx.fillText(name, radius - 8, radius * 0.25);
+      drawUserText(name, radius - 8, radius * 0.25, fontSize);
     }
     ctx.restore();
   }
@@ -1522,6 +1742,171 @@ SUB_COLOR_FIELDS.forEach(({ key, input, reset }) => {
   });
 });
 
+// --- Sub text look: crown/icon, effects, styles + normal-user shadow (Texto tab) ---
+const TWITCH_BADGES_URL = 'https://api.twitch.tv/helix/chat/badges';
+
+function getSubTextSettings() {
+  return {
+    crown: state.subCrown,
+    badgeUrl: state.subBadgeUrl,
+    effects: { ...state.subEffects },
+    styles: { ...state.subStyles },
+    userShadow: { ...state.userShadow },
+  };
+}
+
+function applySubStyleClasses() {
+  SUB_STYLE_KEYS.forEach((k) => document.body.classList.toggle(`sub-${k}`, !!state.subStyles[k]));
+}
+
+function updateBadgePreview() {
+  const has = !!state.subBadgeUrl;
+  els.subBadgePreview.style.display = has ? 'inline-block' : 'none';
+  els.subBadgeClearBtn.style.display = has ? '' : 'none';
+  if (has && els.subBadgePreview.getAttribute('src') !== state.subBadgeUrl) {
+    els.subBadgePreview.src = state.subBadgeUrl;
+  }
+}
+
+function syncSubTextUi() {
+  els.subCrownSelect.value = state.subCrown;
+  SUB_EFFECT_KEYS.forEach((k) => { els[`subFx${capitalize(k)}`].checked = !!state.subEffects[k]; });
+  SUB_STYLE_KEYS.forEach((k) => { els[`subStyle${capitalize(k)}`].checked = !!state.subStyles[k]; });
+  els.userShadowCheckbox.checked = state.userShadow.enabled;
+  els.userShadowColor.value = state.userShadow.color;
+  updateBadgePreview();
+}
+
+function applySubTextSettings(o) {
+  if (!o) return;
+  state.subCrown = ['none', 'crown', 'icon'].includes(o.crown) ? o.crown : 'none';
+  state.subBadgeUrl = typeof o.badgeUrl === 'string' && /^(data:image\/|https:\/\/)/.test(o.badgeUrl) ? o.badgeUrl : null;
+  SUB_EFFECT_KEYS.forEach((k) => { state.subEffects[k] = !!(o.effects && o.effects[k]); });
+  SUB_STYLE_KEYS.forEach((k) => { state.subStyles[k] = !!(o.styles && o.styles[k]); });
+  const shadow = o.userShadow || {};
+  state.userShadow = {
+    enabled: !!shadow.enabled,
+    color: typeof shadow.color === 'string' && HEX_COLOR_RE.test(shadow.color) ? shadow.color : '#000000',
+  };
+  syncSubTextUi();
+  applySubStyleClasses();
+}
+
+function onSubTextChanged() {
+  applySubStyleClasses();
+  renderParticipants(); // rebuilds the list (crown/styles) and saves
+  drawWheel();
+}
+
+function setBadgeStatus(key, params) {
+  els.subBadgeStatus.textContent = key ? t(key, params) : '';
+}
+
+function setSubBadgeUrl(url) {
+  state.subBadgeUrl = url;
+  if (url) state.subCrown = 'icon'; // an icon was configured: use it
+  syncSubTextUi();
+  onSubTextChanged();
+}
+
+function fileToBadgeDataUrl(file, size = 72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+        const w = img.naturalWidth * scale;
+        const h = img.naturalHeight * scale;
+        canvas.getContext('2d').drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+els.subCrownSelect.addEventListener('change', () => {
+  state.subCrown = els.subCrownSelect.value;
+  onSubTextChanged();
+});
+
+SUB_EFFECT_KEYS.forEach((k) => {
+  els[`subFx${capitalize(k)}`].addEventListener('change', () => {
+    state.subEffects[k] = els[`subFx${capitalize(k)}`].checked;
+    onSubTextChanged();
+  });
+});
+
+SUB_STYLE_KEYS.forEach((k) => {
+  els[`subStyle${capitalize(k)}`].addEventListener('change', () => {
+    state.subStyles[k] = els[`subStyle${capitalize(k)}`].checked;
+    onSubTextChanged();
+  });
+});
+
+els.userShadowCheckbox.addEventListener('change', () => {
+  state.userShadow.enabled = els.userShadowCheckbox.checked;
+  onSubTextChanged();
+});
+els.userShadowColor.addEventListener('input', () => {
+  state.userShadow.color = els.userShadowColor.value;
+  onSubTextChanged();
+});
+
+els.subBadgeFile.addEventListener('change', async () => {
+  const file = els.subBadgeFile.files[0];
+  if (!file) return;
+  try {
+    setSubBadgeUrl(await fileToBadgeDataUrl(file));
+    setBadgeStatus('badgeLoaded');
+  } catch (err) {
+    setBadgeStatus('badgeError');
+  }
+  els.subBadgeFile.value = '';
+});
+
+els.subBadgeClearBtn.addEventListener('click', () => {
+  setSubBadgeUrl(null);
+  setBadgeStatus('');
+});
+
+// Channel sub badge from Twitch (Helix chat/badges), using the channel typed in
+// the header and the Client ID/Secret from the Temas tab.
+els.subBadgeTwitchBtn.addEventListener('click', async () => {
+  const channel = els.channelInput.value.trim().replace(/^#/, '').toLowerCase();
+  const clientId = els.twitchClientId.value.trim();
+  const clientSecret = els.twitchClientSecret.value.trim();
+  if (!channel) { setBadgeStatus('badgeNoChannel'); return; }
+  if (!clientId || !clientSecret) { setBadgeStatus('badgeNoCreds'); return; }
+  setBadgeStatus('badgeLoading');
+  try {
+    const token = await getTwitchAppToken(clientId, clientSecret);
+    const headers = { 'Client-Id': clientId, Authorization: `Bearer ${token}` };
+    const userRes = await fetch(`${TWITCH_USERS_URL}?login=${encodeURIComponent(channel)}`, { headers });
+    if (!userRes.ok) throw new Error('twitch-users-request-failed');
+    const user = ((await userRes.json()).data || [])[0];
+    if (!user) { setBadgeStatus('badgeChannelNotFound'); return; }
+    const badgeRes = await fetch(`${TWITCH_BADGES_URL}?broadcaster_id=${encodeURIComponent(user.id)}`, { headers });
+    if (!badgeRes.ok) throw new Error('twitch-badges-request-failed');
+    const set = ((await badgeRes.json()).data || []).find((b) => b.set_id === 'subscriber');
+    const version = set && ((set.versions || []).find((v) => v.id === '0') || (set.versions || [])[0]);
+    const url = version && (version.image_url_2x || version.image_url_1x);
+    if (!url) { setBadgeStatus('badgeNoneFound'); return; }
+    setSubBadgeUrl(url);
+    setBadgeStatus('badgeLoaded');
+  } catch (err) {
+    console.error('Twitch sub badge fetch failed:', err);
+    setBadgeStatus('badgeError');
+  }
+});
+
 function applyThemeAccent(palette) {
   const [accent, hover] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
   document.documentElement.style.setProperty('--theme-accent', accent);
@@ -1801,6 +2186,7 @@ function saveState() {
       subExtraTier3: els.subExtraTier3.value,
       colorPalette: state.colorPalette,
       subColors: state.subColors,
+      subText: getSubTextSettings(),
       wheelScale: els.wheelScaleSlider.value,
       wheelFontSize: els.wheelFontSizeSlider.value,
       theme: els.themeSelect.value,
@@ -1864,6 +2250,7 @@ async function applySavedState() {
     });
     refreshSubColorInputs();
   }
+  if (data.subText) applySubTextSettings(data.subText);
   if (data.wheelScale != null) {
     els.wheelScaleSlider.value = data.wheelScale;
     applyWheelScale(data.wheelScale);
@@ -2017,6 +2404,7 @@ function overlaySnapshot() {
     rotation: state.rotation,
     colorPalette: state.colorPalette,
     subColors: state.subColors,
+    subText: getSubTextSettings(),
     wheelFontScale: state.wheelFontScale,
     wheelScale: els.wheelScaleSlider.value,
     rouletteImageMode: state.rouletteImageMode,
@@ -2163,6 +2551,7 @@ function applyOverlayState(m, keepRotation) {
   if (!keepRotation) state.rotation = m.rotation;
   state.colorPalette = m.colorPalette;
   if (m.subColors) state.subColors = m.subColors;
+  if (m.subText) applySubTextSettings(m.subText);
   state.wheelFontScale = m.wheelFontScale;
   state.rouletteImageMode = m.rouletteImageMode;
   Object.entries(m.settings).forEach(([k, v]) => { els[k].value = v; });

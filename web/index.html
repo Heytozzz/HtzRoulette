@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=12" />
+  <link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
   <header>
@@ -156,6 +156,7 @@
 
       <div class="tab-bar" role="tablist">
         <button class="tab-btn active" data-tab="appearance" role="tab" data-i18n="appearanceTitle">Aspecto</button>
+        <button class="tab-btn" data-tab="text" role="tab" data-i18n="tabText">Texto</button>
         <button class="tab-btn" data-tab="themes" role="tab" data-i18n="themesSubcategory">Temas</button>
         <button class="tab-btn" data-tab="commands" role="tab" data-i18n="tabCommands">Comandos</button>
         <button class="tab-btn" data-tab="overlays" role="tab" data-i18n="tabOverlays">Overlays</button>
@@ -177,27 +178,75 @@
         <option value="rainbow" data-i18n="presetRainbow">Arcoíris</option>
       </select>
 
-      <label data-i18n="subTextTitle">Texto de subs en la ruleta</label>
-      <div class="sub-colors">
-        <div class="color-row">
-          <span class="color-label" data-i18n="subFillLabel">Relleno</span>
-          <input id="subFillColor" type="color" value="#ffffff" />
-          <span id="subFillHint" class="color-hint"></span>
-          <button id="subFillReset" class="small-btn" data-i18n="resetColorBtn">Restablecer</button>
-        </div>
-        <div class="color-row">
-          <span class="color-label" data-i18n="subStrokeLabel">Contorno</span>
-          <input id="subStrokeColor" type="color" value="#ffffff" />
-          <span id="subStrokeHint" class="color-hint"></span>
-          <button id="subStrokeReset" class="small-btn" data-i18n="resetColorBtn">Restablecer</button>
-        </div>
-        <div class="color-row">
-          <span class="color-label" data-i18n="subGlowLabel">Glow</span>
-          <input id="subGlowColor" type="color" value="#ffffff" />
-          <span id="subGlowHint" class="color-hint"></span>
-          <button id="subGlowReset" class="small-btn" data-i18n="resetColorBtn">Restablecer</button>
-        </div>
       </div>
+      <div class="settings-tab hidden" data-tab="text" role="tabpanel">
+        <h3 data-i18n="subsSection">Subs</h3>
+        <label data-i18n="subColorsTitle">Colores del texto en la ruleta</label>
+        <div class="sub-colors">
+          <div class="color-row">
+            <span class="color-label" data-i18n="subFillLabel">Relleno</span>
+            <input id="subFillColor" type="color" value="#ffffff" />
+            <span id="subFillHint" class="color-hint"></span>
+            <button id="subFillReset" class="small-btn" data-i18n="resetColorBtn">Restablecer</button>
+          </div>
+          <div class="color-row">
+            <span class="color-label" data-i18n="subStrokeLabel">Contorno</span>
+            <input id="subStrokeColor" type="color" value="#ffffff" />
+            <span id="subStrokeHint" class="color-hint"></span>
+            <button id="subStrokeReset" class="small-btn" data-i18n="resetColorBtn">Restablecer</button>
+          </div>
+          <div class="color-row">
+            <span class="color-label" data-i18n="subGlowLabel">Glow</span>
+            <input id="subGlowColor" type="color" value="#ffffff" />
+            <span id="subGlowHint" class="color-hint"></span>
+            <button id="subGlowReset" class="small-btn" data-i18n="resetColorBtn">Restablecer</button>
+          </div>
+        </div>
+
+        <label data-i18n="subCrownLabel">Corona / icono</label>
+        <select id="subCrownSelect">
+          <option value="none" data-i18n="crownNone">Ninguna</option>
+          <option value="crown" data-i18n="crownSymbol">Corona ♕ (dorada)</option>
+          <option value="icon" data-i18n="crownIcon">Icono de sub del canal</option>
+        </select>
+        <label data-i18n="subBadgeFileLabel">Icono de sub del canal (imagen propia)</label>
+        <input id="subBadgeFile" type="file" accept="image/*" />
+        <div class="badge-actions">
+          <button id="subBadgeTwitchBtn" class="small-btn" data-i18n="subBadgeTwitchBtn">Cargar del canal (Twitch)</button>
+          <button id="subBadgeClearBtn" class="small-btn" data-i18n="subBadgeClearBtn">Quitar icono</button>
+          <img id="subBadgePreview" class="badge-preview" alt="" />
+        </div>
+        <p id="subBadgeStatus" class="modal-note"></p>
+
+        <label data-i18n="subEffectsTitle">Efectos (combinables)</label>
+        <div class="check-grid">
+          <label class="inline-label"><input id="subFxBounce" type="checkbox" /><span data-i18n="fxBounce">Salto</span></label>
+          <label class="inline-label"><input id="subFxWave" type="checkbox" /><span data-i18n="fxWave">Ondulación</span></label>
+          <label class="inline-label"><input id="subFxBlink" type="checkbox" /><span data-i18n="fxBlink">Parpadeo</span></label>
+          <label class="inline-label"><input id="subFxGlitch" type="checkbox" /><span data-i18n="fxGlitch">Glitch</span></label>
+          <label class="inline-label"><input id="subFxRainbow" type="checkbox" /><span data-i18n="fxRainbow">Rainbow</span></label>
+        </div>
+
+        <label data-i18n="subStylesTitle">Estilos</label>
+        <div class="check-grid">
+          <label class="inline-label"><input id="subStyleBold" type="checkbox" /><span data-i18n="styleBold">Negrita</span></label>
+          <label class="inline-label"><input id="subStyleItalic" type="checkbox" /><span data-i18n="styleItalic">Cursiva</span></label>
+          <label class="inline-label"><input id="subStyleUnderline" type="checkbox" /><span data-i18n="styleUnderline">Subrayado</span></label>
+          <label class="inline-label"><input id="subStyleStrike" type="checkbox" /><span data-i18n="styleStrike">Tachado</span></label>
+          <label class="inline-label"><input id="subStyleUppercase" type="checkbox" /><span data-i18n="styleUppercase">Mayúsculas</span></label>
+        </div>
+
+        <p class="modal-note" data-i18n="subTextNote">Nota</p>
+
+        <h3 data-i18n="normalUsersSection">Usuarios normales</h3>
+        <label class="inline-label">
+          <input id="userShadowCheckbox" type="checkbox" />
+          <span data-i18n="userShadowLabel">Sombra en el texto de la ruleta</span>
+        </label>
+        <div class="color-row">
+          <span class="color-label" data-i18n="userShadowColorLabel">Color de la sombra</span>
+          <input id="userShadowColor" type="color" value="#000000" />
+        </div>
       </div>
       <div class="settings-tab hidden" data-tab="themes" role="tabpanel">
       <h3 data-i18n="themesSubcategory">Temas</h3>
@@ -270,6 +319,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

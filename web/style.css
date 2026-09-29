@@ -601,3 +601,17 @@ body.overlay-eliminated #overlayRoot { align-items: flex-start; }
 .color-row input[type="color"] { width: 40px; height: 26px; padding: 0; border: 1px solid #3a3b42; border-radius: 4px; background: transparent; cursor: pointer; }
 .color-hint { flex: 1; font-size: 11px; color: #9a9aa4; }
 .small-btn { font-size: 12px; padding: 3px 8px; }
+
+/* Sub crown / icon, font styles and settings extras */
+.sub-crown { color: #ffd700; margin-right: 4px; text-shadow: 0 0 4px rgba(255, 215, 0, 0.7); }
+.sub-badge-img { width: 1.15em; height: 1.15em; margin-right: 4px; object-fit: contain; vertical-align: middle; }
+body.sub-bold .sub-name { font-weight: 700; }
+body.sub-italic .sub-name { font-style: italic; }
+body.sub-underline .sub-name { text-decoration: underline; }
+body.sub-strike .sub-name { text-decoration: line-through; }
+body.sub-underline.sub-strike .sub-name { text-decoration: underline line-through; }
+body.sub-uppercase .sub-name { text-transform: uppercase; }
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin: 4px 0; }
+.check-grid .inline-label { margin: 2px 0; }
+.badge-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px 0; }
+.badge-preview { width: 28px; height: 28px; object-fit: contain; display: none; border: 1px solid #3a3b42; border-radius: 4px; background: #24252b; }
