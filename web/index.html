@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=15" />
+  <link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
   <header>
@@ -157,6 +157,7 @@
       <div class="tab-bar" role="tablist">
         <button class="tab-btn active" data-tab="appearance" role="tab" data-i18n="appearanceTitle">Aspecto</button>
         <button class="tab-btn" data-tab="text" role="tab" data-i18n="tabText">Texto</button>
+        <button class="tab-btn" data-tab="sound" role="tab" data-i18n="tabSound">Sonido</button>
         <button class="tab-btn" data-tab="themes" role="tab" data-i18n="themesSubcategory">Temas</button>
         <button class="tab-btn" data-tab="commands" role="tab" data-i18n="tabCommands">Comandos</button>
         <button class="tab-btn" data-tab="overlays" role="tab" data-i18n="tabOverlays">Overlays</button>
@@ -248,6 +249,20 @@
           <input id="userShadowColor" type="color" value="#000000" />
         </div>
       </div>
+      <div class="settings-tab hidden" data-tab="sound" role="tabpanel">
+        <label data-i18n="soundPackLabel">Pack de sonidos</label>
+        <select id="soundPackSelect">
+          <option value="original" data-i18n="soundPackOriginal">Original</option>
+          <option value="minecraft" data-i18n="soundPackMinecraft">Minecraft</option>
+        </select>
+        <p class="modal-note" data-i18n="soundPackNote">Nota</p>
+        <label data-i18n="soundPreviewTitle">Probar sonidos</label>
+        <div class="badge-actions">
+          <button id="soundPreviewTick" class="small-btn" data-i18n="soundPreviewTick">Giro</button>
+          <button id="soundPreviewSelect" class="small-btn" data-i18n="soundPreviewSelect">Selección</button>
+          <button id="soundPreviewFinal" class="small-btn" data-i18n="soundPreviewFinal">Ganador final</button>
+        </div>
+      </div>
       <div class="settings-tab hidden" data-tab="themes" role="tabpanel">
       <h3 data-i18n="themesSubcategory">Temas</h3>
       <label data-i18n="themeLabel">Carpeta de tema</label>
@@ -319,6 +334,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

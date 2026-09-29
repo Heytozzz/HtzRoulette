@@ -24,6 +24,7 @@ const state = {
   subEffects: { bounce: false, wave: false, blink: false, glitch: false, rainbow: false },
   subStyles: { bold: false, italic: false, underline: false, strike: false, uppercase: false },
   userShadow: { enabled: false, color: '#000000' },
+  soundPack: 'original', // key of SOUND_PACKS
   wheelFontScale: 1,
   subNames: new Set(),
   joinAccepted: false,
@@ -177,6 +178,10 @@ const els = {
   subBadgeStatus: document.getElementById('subBadgeStatus'),
   userShadowCheckbox: document.getElementById('userShadowCheckbox'),
   userShadowColor: document.getElementById('userShadowColor'),
+  soundPackSelect: document.getElementById('soundPackSelect'),
+  soundPreviewTick: document.getElementById('soundPreviewTick'),
+  soundPreviewSelect: document.getElementById('soundPreviewSelect'),
+  soundPreviewFinal: document.getElementById('soundPreviewFinal'),
 };
 SUB_EFFECT_KEYS.forEach((k) => {
   els[`subFx${capitalize(k)}`] = document.getElementById(`subFx${capitalize(k)}`);
@@ -1007,13 +1012,13 @@ function spinEasing(x) {
 // Time-based animation. requestAnimationFrame draws it smoothly while the
 // tab is visible; a Web Worker watchdog keeps stepping it (and finishes it on
 // time) when the browser stops delivering animation frames in the background.
-function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle, onDone }) {
+function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle, endKind, onDone }) {
   const startTime = performance.now();
   let lastStep = 0;
   let finished = false;
   let watchdog = null;
 
-  scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle });
+  scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle, endKind });
   state.animating = true;
 
   function step() {
@@ -1043,6 +1048,22 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
   }, 30);
   requestAnimationFrame(frame);
 }
+// What the end of this spin means, so the right sound can be scheduled up front:
+// 'final' = a final winner is chosen, 'select' = someone is picked but the game goes on.
+// (Mirrors the decisions in onSpinComplete.)
+function predictSpinEndKind(selection, settings) {
+  const { indices, names } = selection;
+  if (settings.mode === 'normal') return 'final';
+  const gone = new Set(indices);
+  const remaining = new Set(state.participants.filter((_, i) => !gone.has(i)));
+  if (settings.mode === 'elimination') {
+    return remaining.size <= settings.eliminationFinalWinnersCount ? 'final' : 'select';
+  }
+  if (settings.winnersSubMode === 'simultaneous') return 'final';
+  const won = state.winnersLog.length + (state.winnersLog.includes(names[0]) ? 0 : 1);
+  return won >= settings.winnersCount || remaining.size === 0 ? 'final' : 'select';
+}
+
 function spin() {
   if (state.spinning || state.participants.length === 0) return;
   state.spinning = true;
@@ -1064,12 +1085,14 @@ function spin() {
   const targetRotation = startRotation + alignmentDelta + extraSpins * Math.PI * 2;
 
   const duration = settings.spinDurationMs;
-  sendOverlay({ t: 'spin', startRotation, targetRotation, duration });
+  const endKind = predictSpinEndKind(getSelectionForRotation(targetRotation, pointerCount), settings);
+  sendOverlay({ t: 'spin', startRotation, targetRotation, duration, endKind });
   runSpinAnimation({
     startRotation,
     targetRotation,
     duration,
     sliceAngle,
+    endKind,
     onDone: () => onSpinComplete(getSelectionForRotation(state.rotation, pointerCount), settings),
   });
 }
@@ -2082,7 +2105,7 @@ els.deleteThemeBtn.addEventListener('click', async () => {
   applyTheme('');
 });
 
-// --- Sound effects (procedurally generated, no audio files needed) ---
+// --- Sound effects (sound packs) ---
 let audioCtx = null;
 function getAudioCtx() {
   if (!audioCtx) {
@@ -2104,6 +2127,57 @@ function unlockAudio() {
 document.addEventListener('visibilitychange', () => {
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
 });
+
+// Sound packs. 'original' is synthesized (a tick while spinning, one sound when it
+// lands). 'minecraft' uses samples: click = each wheel tick, orb = someone is
+// selected but the game goes on, levelup = a final winner is chosen.
+const SOUND_PACKS = {
+  original: null,
+  minecraft: {
+    click: { url: 'sounds/minecraft/click.ogg', gain: 0.5 },
+    orb: { url: 'sounds/minecraft/orb.ogg', gain: 0.6 },
+    levelup: { url: 'sounds/minecraft/levelup.ogg', gain: 0.6 },
+  },
+};
+// Which sample plays for each kind of sound
+const SOUND_SAMPLE_FOR = { tick: 'click', select: 'orb', final: 'levelup' };
+const soundBuffers = {}; // pack -> { sampleName: AudioBuffer }
+const soundLoads = {}; // pack -> Promise
+
+// Decoding with an OfflineAudioContext needs no user gesture, and the
+// resulting buffers can be played by any AudioContext.
+function decodeSample(arrayBuffer) {
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const decoder = new Offline(1, 1, 44100);
+  return new Promise((resolve, reject) => {
+    const maybePromise = decoder.decodeAudioData(arrayBuffer, resolve, reject);
+    if (maybePromise && typeof maybePromise.catch === 'function') maybePromise.catch(() => {});
+  });
+}
+
+function loadSoundPack(pack) {
+  const samples = SOUND_PACKS[pack];
+  if (!samples) return Promise.resolve();
+  if (soundLoads[pack]) return soundLoads[pack];
+  soundBuffers[pack] = {};
+  soundLoads[pack] = Promise.all(Object.entries(samples).map(async ([name, { url }]) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      soundBuffers[pack][name] = await decodeSample(await res.arrayBuffer());
+    } catch (err) {
+      // Falls back to the original synthesized sound for this one
+      console.warn(`Sound "${name}" of pack "${pack}" could not be loaded`, err);
+    }
+  }));
+  return soundLoads[pack];
+}
+
+function getPackSample(name) {
+  const samples = SOUND_PACKS[state.soundPack];
+  const buffer = samples && soundBuffers[state.soundPack] && soundBuffers[state.soundPack][name];
+  return buffer ? { buffer, gain: samples[name].gain } : null;
+}
 
 function scheduleTick(ctx, when) {
   const osc = ctx.createOscillator();
@@ -2130,11 +2204,28 @@ function scheduleLanding(ctx, when) {
   osc.stop(when + 0.45);
 }
 
+// kind: 'tick' | 'select' | 'final'. Uses the current pack's sample, or the
+// original synthesized sound when the pack has none for it (or it isn't loaded).
+function scheduleSound(ctx, kind, when, gainScale = 1) {
+  const sample = getPackSample(SOUND_SAMPLE_FOR[kind]);
+  if (sample) {
+    const src = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    src.buffer = sample.buffer;
+    gain.gain.value = sample.gain * gainScale;
+    src.connect(gain).connect(ctx.destination);
+    src.start(when);
+    return;
+  }
+  if (kind === 'tick') scheduleTick(ctx, when);
+  else scheduleLanding(ctx, when);
+}
+
 // The spin is fully deterministic (same easing/duration as the animation), so
-// every tick and the landing sound are computed up front and scheduled on the
+// every tick and the end sound are computed up front and scheduled on the
 // audio clock. The audio thread plays them on time regardless of whether the
 // tab is in the background or the main thread is throttled.
-function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle }) {
+function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle, endKind }) {
   if (IS_OVERLAY && !OVERLAY_SOUND) return;
   let ctx;
   try {
@@ -2142,6 +2233,7 @@ function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngl
   } catch (err) {
     return;
   }
+  loadSoundPack(state.soundPack); // no-op when already loaded
   const startPerf = performance.now();
 
   const tickTimesMs = [];
@@ -2162,10 +2254,16 @@ function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngl
     try {
       const elapsedMs = performance.now() - startPerf;
       const spinStartOnAudioClock = ctx.currentTime - elapsedMs / 1000;
-      tickTimesMs.forEach((ms) => {
-        if (ms >= elapsedMs) scheduleTick(ctx, spinStartOnAudioClock + ms / 1000);
+      tickTimesMs.forEach((ms, i) => {
+        if (ms < elapsedMs) return;
+        // Sampled clicks pile up when the wheel is fast, so quiet them down when ticks are dense
+        const gapMs = i === 0 ? Infinity : ms - tickTimesMs[i - 1];
+        const density = Math.min(1, Math.max(0.35, gapMs / 80));
+        scheduleSound(ctx, 'tick', spinStartOnAudioClock + ms / 1000, density);
       });
-      if (duration >= elapsedMs) scheduleLanding(ctx, spinStartOnAudioClock + duration / 1000);
+      if (duration >= elapsedMs) {
+        scheduleSound(ctx, endKind === 'final' ? 'final' : 'select', spinStartOnAudioClock + duration / 1000);
+      }
     } catch (err) {
       // Audio may be unavailable/blocked; fail silently
     }
@@ -2174,6 +2272,25 @@ function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngl
   if (ctx.state === 'running') schedule();
   else ctx.resume().then(schedule).catch(() => {});
 }
+
+// Plays one sound of the current pack (used by the preview buttons)
+function previewSound(kind) {
+  try {
+    const ctx = getAudioCtx();
+    scheduleSound(ctx, kind, ctx.currentTime + 0.02);
+  } catch (err) {
+    // Audio unavailable
+  }
+}
+
+els.soundPackSelect.addEventListener('change', () => {
+  state.soundPack = SOUND_PACKS[els.soundPackSelect.value] !== undefined ? els.soundPackSelect.value : 'original';
+  loadSoundPack(state.soundPack);
+  saveState();
+});
+els.soundPreviewTick.addEventListener('click', () => previewSound('tick'));
+els.soundPreviewSelect.addEventListener('click', () => previewSound('select'));
+els.soundPreviewFinal.addEventListener('click', () => previewSound('final'));
 
 // --- Persist settings + participants across page reloads ---
 const SAVED_STATE_KEY = 'htz_saved_state';
@@ -2203,6 +2320,7 @@ function saveState() {
       colorPalette: state.colorPalette,
       subColors: state.subColors,
       subText: getSubTextSettings(),
+      soundPack: state.soundPack,
       wheelScale: els.wheelScaleSlider.value,
       wheelFontSize: els.wheelFontSizeSlider.value,
       theme: els.themeSelect.value,
@@ -2267,6 +2385,10 @@ async function applySavedState() {
     refreshSubColorInputs();
   }
   if (data.subText) applySubTextSettings(data.subText);
+  if (typeof data.soundPack === 'string' && data.soundPack in SOUND_PACKS) {
+    state.soundPack = data.soundPack;
+    els.soundPackSelect.value = data.soundPack;
+  }
   if (data.wheelScale != null) {
     els.wheelScaleSlider.value = data.wheelScale;
     applyWheelScale(data.wheelScale);
@@ -2421,6 +2543,7 @@ function overlaySnapshot() {
     colorPalette: state.colorPalette,
     subColors: state.subColors,
     subText: getSubTextSettings(),
+    soundPack: state.soundPack,
     wheelFontScale: state.wheelFontScale,
     wheelScale: els.wheelScaleSlider.value,
     rouletteImageMode: state.rouletteImageMode,
@@ -2568,6 +2691,10 @@ function applyOverlayState(m, keepRotation) {
   state.colorPalette = m.colorPalette;
   if (m.subColors) state.subColors = m.subColors;
   if (m.subText) applySubTextSettings(m.subText);
+  if (typeof m.soundPack === 'string' && m.soundPack in SOUND_PACKS) {
+    state.soundPack = m.soundPack;
+    if (OVERLAY_SOUND) loadSoundPack(state.soundPack); // overlays are silent unless &sound=1
+  }
   state.wheelFontScale = m.wheelFontScale;
   state.rouletteImageMode = m.rouletteImageMode;
   Object.entries(m.settings).forEach(([k, v]) => { els[k].value = v; });
@@ -2606,6 +2733,7 @@ function handleOverlayMessage(m) {
       startRotation: m.startRotation,
       targetRotation: m.targetRotation,
       duration: m.duration,
+      endKind: m.endKind,
       sliceAngle: (Math.PI * 2) / Math.max(1, state.participants.length),
       onDone: () => {
         overlaySpinning = false;
@@ -2660,6 +2788,7 @@ loadStrings().then(async () => {
     await refreshThemeSelect();
     await applySavedState();
     renderSavedLists();
+    loadSoundPack(state.soundPack);
   }
   renderParticipants();
   renderLogs();
