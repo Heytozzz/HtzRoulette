@@ -615,3 +615,17 @@ body.sub-uppercase .sub-name { text-transform: uppercase; }
 .check-grid .inline-label { margin: 2px 0; }
 .badge-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px 0; }
 .badge-preview { width: 28px; height: 28px; object-fit: contain; display: none; border: 1px solid #3a3b42; border-radius: 4px; background: #24252b; }
+
+/* Crown button: toggles sub status of a participant */
+.participants li .sub-btn {
+  background: transparent;
+  color: #ffd700;
+  border: none;
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.4;
+}
+.participants li .sub-btn:hover { opacity: 0.85; }
+.participants li .sub-btn.active { opacity: 1; text-shadow: 0 0 5px rgba(255, 215, 0, 0.8); }

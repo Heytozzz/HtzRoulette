@@ -171,5 +171,7 @@
   "subTextNote": "La corona/icono y los estilos también se ven en la lista de participantes. Los efectos animados solo se ven en la ruleta. Con \"Icono de sub del canal\" y sin icono configurado se usa la corona.",
   "normalUsersSection": "Usuarios normales",
   "userShadowLabel": "Sombra en el texto de la ruleta",
-  "userShadowColorLabel": "Color de la sombra"
+  "userShadowColorLabel": "Color de la sombra",
+  "makeSubTitle": "Convertir en sub",
+  "removeSubTitle": "Quitar sub"
 }

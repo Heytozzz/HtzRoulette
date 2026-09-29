@@ -371,6 +371,14 @@ function renderParticipants() {
     const actions = document.createElement('span');
     actions.className = 'actions';
 
+    const isSub = state.subNames.has(name);
+    const subBtn = document.createElement('button');
+    subBtn.className = `sub-btn${isSub ? ' active' : ''}`;
+    subBtn.textContent = '\u2655';
+    subBtn.title = t(isSub ? 'removeSubTitle' : 'makeSubTitle');
+    subBtn.addEventListener('click', () => toggleSubByName(name));
+    actions.appendChild(subBtn);
+
     const removeBtn = document.createElement('button');
     removeBtn.className = 'remove-btn';
     removeBtn.textContent = '×';
@@ -389,6 +397,14 @@ function renderParticipants() {
     els.participantList.appendChild(li);
   });
   saveState();
+}
+
+// Marks/unmarks a participant as sub (applies to all of their slots on the wheel)
+function toggleSubByName(name) {
+  if (state.subNames.has(name)) state.subNames.delete(name);
+  else state.subNames.add(name);
+  renderParticipants();
+  drawWheel();
 }
 
 function duplicateParticipantByName(name) {
