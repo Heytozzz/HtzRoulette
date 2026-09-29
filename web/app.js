@@ -1458,17 +1458,11 @@ const THEME_ACCENT_COLORS = {
   rainbow: ['#6441a5', '#7d5bbe'],
 };
 
-const SUB_NEON_COLORS = {
-  red: '#ff3b3b',
-  blue: '#3bb0ff',
-  green: '#39ff6a',
-  purple: '#c23bff',
-  gray: '#e8e8e8',
-  rainbow: '#ffd700',
-};
+// Sub names on the wheel always glow gold, whatever the theme palette is
+const SUB_NEON_COLOR = '#ffd700';
 
 function getSubNeonColor() {
-  return SUB_NEON_COLORS[state.colorPalette] || SUB_NEON_COLORS.red;
+  return SUB_NEON_COLOR;
 }
 
 function applyThemeAccent(palette) {
