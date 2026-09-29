@@ -553,23 +553,36 @@ function drawWheel() {
   drawPointers(cx, cy, radius);
 }
 
-// Sub names on the wheel: white core, then an outline in the theme's neon
-// color, then a glow of that same color around the outline.
+// Sub names on the wheel. Layers from the center outwards:
+// white text -> gold stroke -> thin black stroke -> gold glow.
+// They are painted from the outside in, so each one covers the inner half of
+// the one below it.
 function drawSubNeonText(text, x, y, fontSize) {
-  const neon = getSubNeonColor();
+  const gold = getSubNeonColor();
+  const goldWidth = Math.max(3, fontSize * 0.2);
+  const blackVisible = Math.max(1.25, fontSize * 0.07);
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.miterLimit = 2;
-  ctx.lineWidth = Math.max(3, fontSize * 0.2);
-  ctx.strokeStyle = neon;
-  ctx.shadowColor = neon;
+
+  // Outer layer: black stroke whose shadow is the gold glow
+  ctx.lineWidth = goldWidth + blackVisible * 2;
+  ctx.strokeStyle = '#000';
+  ctx.shadowColor = gold;
   ctx.shadowBlur = Math.max(10, fontSize * 0.6);
-  ctx.strokeText(text, x, y); // outline + glow
+  ctx.strokeText(text, x, y);
   ctx.strokeText(text, x, y); // second pass makes the glow stronger
+
+  // Gold stroke on top of it (no shadow)
   ctx.shadowBlur = 0;
   ctx.shadowColor = 'transparent';
+  ctx.lineWidth = goldWidth;
+  ctx.strokeStyle = gold;
+  ctx.strokeText(text, x, y);
+
+  // White core
   ctx.fillStyle = '#fff';
-  ctx.fillText(text, x, y); // white core on top
+  ctx.fillText(text, x, y);
   ctx.restore();
 }
 
