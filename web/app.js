@@ -1422,6 +1422,21 @@ els.manualNameInput.addEventListener('keydown', (e) => {
 
 els.shuffleBtn.addEventListener('click', shuffleParticipants);
 
+// Settings modal tabs (the last opened tab is remembered until the page reloads)
+function showSettingsTab(name) {
+  document.querySelectorAll('#appearanceModal .tab-btn').forEach((btn) => {
+    const active = btn.dataset.tab === name;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('#appearanceModal .settings-tab').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.tab !== name);
+  });
+}
+document.querySelectorAll('#appearanceModal .tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => showSettingsTab(btn.dataset.tab));
+});
+
 els.gearBtn.addEventListener('click', () => {
   els.appearanceModal.classList.remove('hidden');
 });

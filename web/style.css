@@ -282,7 +282,11 @@ main {
   border: 1px solid #3a3b42;
   border-radius: 8px;
   padding: 16px 20px;
-  width: 320px;
+  width: 440px;
+  max-width: 94vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header {
@@ -564,3 +568,28 @@ body.overlay-eliminated #overlayRoot { align-items: flex-start; }
 .cmd-status { font-size: 12px; opacity: 0.85; margin-left: 8px; }
 #modCmdWhitelist { width: 100%; box-sizing: border-box; }
 .saved-list-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
+
+/* Settings modal tabs */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 10px 0;
+  border-bottom: 1px solid #3a3b42;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 4px 4px 0 0;
+  color: #b8b8c0;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.tab-btn:hover { background: #24252b; color: #fff; }
+.tab-btn.active { color: #fff; border-bottom-color: var(--theme-accent, #ffcc00); font-weight: 600; }
+.tab-panels { overflow-y: auto; flex: 1; min-height: 320px; padding-right: 4px; }
+.settings-tab.hidden { display: none; }

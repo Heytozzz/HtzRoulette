@@ -130,5 +130,7 @@
   "cmdListEmpty": "No hay participantes que guardar",
   "cmdListSaved": "Lista «{name}» guardada ({n})",
   "cmdListLoaded": "Lista «{name}» cargada ({n})",
-  "cmdListNotFound": "No existe la lista «{name}»"
+  "cmdListNotFound": "No existe la lista «{name}»",
+  "tabCommands": "Comandos",
+  "tabOverlays": "Overlays"
 }

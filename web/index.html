@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
 </head>
 <body>
   <header>
@@ -150,11 +150,19 @@
   <div id="appearanceModal" class="modal-overlay hidden">
     <div class="modal-box">
       <div class="modal-header">
-        <h2 data-i18n="appearanceTitle">Aspecto</h2>
+        <h2 data-i18n="settingsTitle">Configuración</h2>
         <button id="closeAppearanceModal" class="close-btn" data-i18n="closeBtn">Cerrar</button>
       </div>
 
-      <h3 data-i18n="rouletteSubcategory">Ruleta</h3>
+      <div class="tab-bar" role="tablist">
+        <button class="tab-btn active" data-tab="appearance" role="tab" data-i18n="appearanceTitle">Aspecto</button>
+        <button class="tab-btn" data-tab="themes" role="tab" data-i18n="themesSubcategory">Temas</button>
+        <button class="tab-btn" data-tab="commands" role="tab" data-i18n="tabCommands">Comandos</button>
+        <button class="tab-btn" data-tab="overlays" role="tab" data-i18n="tabOverlays">Overlays</button>
+        <button class="tab-btn" data-tab="debug" role="tab" data-i18n="debugSubcategory">Debug</button>
+      </div>
+      <div class="tab-panels">
+      <div class="settings-tab" data-tab="appearance" role="tabpanel">
       <label data-i18n="wheelScaleLabel">Escala de la ruleta</label>
       <input id="wheelScaleSlider" type="range" min="50" max="150" step="5" value="100" />
       <label data-i18n="wheelFontSizeLabel">Tamaño de letra de la ruleta</label>
@@ -168,7 +176,8 @@
         <option value="gray" data-i18n="presetGray">Gris</option>
         <option value="rainbow" data-i18n="presetRainbow">Arcoíris</option>
       </select>
-
+      </div>
+      <div class="settings-tab hidden" data-tab="themes" role="tabpanel">
       <h3 data-i18n="themesSubcategory">Temas</h3>
       <label data-i18n="themeLabel">Carpeta de tema</label>
       <select id="themeSelect">
@@ -199,8 +208,8 @@
       <input id="newThemeRouletteFiles" type="file" accept="image/*" multiple />
       <button id="saveThemeBtn" data-i18n="saveThemeBtn">Guardar tema</button>
       <p class="modal-note" data-i18n="themeSavedNote">Los temas se guardan en este navegador (no se suben a ningún servidor).</p>
-
-      <h3 data-i18n="cmdSettingsTitle">Comandos de chat</h3>
+      </div>
+      <div class="settings-tab hidden" data-tab="commands" role="tabpanel">
       <label data-i18n="cmdPrefixLabel">Prefijo de comandos</label>
       <input id="cmdPrefixInput" type="text" value="!htz" />
       <label class="inline-label">
@@ -216,8 +225,8 @@
       <p class="modal-note" data-i18n="cmdHelpNote">Comandos.</p>
       <label data-i18n="savedListsTitle">Listas guardadas</label>
       <div id="savedListsContainer"></div>
-
-      <h3 data-i18n="overlaysTitle">Overlays para OBS</h3>
+      </div>
+      <div class="settings-tab hidden" data-tab="overlays" role="tabpanel">
       <p class="modal-note" data-i18n="overlaysNote">Añade cada link como "Fuente de navegador" en OBS. Esta página debe seguir abierta para que los overlays se actualicen.</p>
       <label data-i18n="overlayWheelLabel">Ruleta + mensajes de ganador/eliminado</label>
       <div class="overlay-row"><input id="overlayLinkWheel" type="text" readonly /><button data-copy="overlayLinkWheel" data-i18n="copyBtn">Copiar</button></div>
@@ -226,17 +235,19 @@
       <label data-i18n="overlayParticipantsLabel">Lista de participantes</label>
       <div class="overlay-row"><input id="overlayLinkParticipants" type="text" readonly /><button data-copy="overlayLinkParticipants" data-i18n="copyBtn">Copiar</button></div>
       <p id="overlayStatusText" class="modal-note"></p>
-
-      <h3 data-i18n="debugSubcategory">Debug</h3>
+      </div>
+      <div class="settings-tab hidden" data-tab="debug" role="tabpanel">
       <label class="inline-label">
         <input id="debugModeCheckbox" type="checkbox" />
         <span data-i18n="debugModeLabel">Modo debug (temporal, arrastra cajas/botones)</span>
       </label>
       <p class="modal-note" data-i18n="debugModeNote">No se guarda: al recargar la página vuelve al orden normal.</p>
+      </div>
+      </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
