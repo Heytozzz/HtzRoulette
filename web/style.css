@@ -99,14 +99,25 @@ main {
   max-width: 280px;
 }
 
-.participants {
+.participants,
+.participants-controls {
   background: rgba(23, 24, 28, 0.75);
+  border: 1px solid #2f3036;
   padding: 8px;
   border-radius: 6px;
 }
 
+.participants h2 {
+  margin: 0 0 8px 0;
+}
+
+.participants-controls .add-participant {
+  margin-top: 0;
+}
+
 .logs-box {
   background: rgba(23, 24, 28, 0.75);
+  border: 1px solid #2f3036;
   padding: 8px;
   border-radius: 6px;
 }
@@ -176,19 +187,42 @@ main {
 
 .participants ul {
   list-style: none;
+  margin: 0;
   padding: 0;
-  max-height: 500px;
+  /* Shows 12 rows (every row is exactly 32px tall); the rest is scrolled */
+  max-height: calc(32px * 12);
   overflow-y: auto;
-  /* Scrollbar hidden: list is scrolled via mouse wheel / touch only */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
+/* Custom scrollbar: rounded thumb in the theme color, invisible track */
 .participants ul::-webkit-scrollbar {
-  display: none;
+  width: 8px;
+}
+
+.participants ul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.participants ul::-webkit-scrollbar-thumb {
+  background: var(--theme-accent, #ffcc00);
+  border-radius: 8px;
+}
+
+.participants ul::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-accent-hover, #ffdd44);
+}
+
+/* Firefox (it has no ::-webkit-scrollbar; Chrome would ignore the rules above if these were set) */
+@supports not selector(::-webkit-scrollbar) {
+  .participants ul {
+    scrollbar-width: thin;
+    scrollbar-color: var(--theme-accent, #ffcc00) transparent;
+  }
 }
 
 .participants li {
+  box-sizing: border-box;
+  height: 32px;
   padding: 4px 8px;
   border-bottom: 1px solid #2a2b31;
   display: flex;

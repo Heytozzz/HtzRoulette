@@ -25,6 +25,7 @@ const state = {
   subStyles: { bold: false, italic: false, underline: false, strike: false, uppercase: false },
   userShadow: { enabled: false, color: '#000000' },
   soundPack: 'original', // key of SOUND_PACKS
+  recentOrder: [], // unique participant names in the order they joined (oldest first)
   wheelFontScale: 1,
   subNames: new Set(),
   joinAccepted: false,
@@ -331,7 +332,31 @@ function createSubBadgeElement() {
   return crown;
 }
 
+// Keeps recentOrder in step with state.participants: names that left are dropped
+// and names that are new are appended (newest last). The list shows it reversed,
+// so the most recent participant is always on top, whatever order the wheel has
+// (e.g. after shuffling).
+function syncRecentOrder() {
+  const present = new Set(state.participants);
+  const seen = new Set();
+  const order = [];
+  state.recentOrder.forEach((name) => {
+    if (present.has(name) && !seen.has(name)) {
+      seen.add(name);
+      order.push(name);
+    }
+  });
+  state.participants.forEach((name) => {
+    if (!seen.has(name)) {
+      seen.add(name);
+      order.push(name);
+    }
+  });
+  state.recentOrder = order;
+}
+
 function renderParticipants() {
+  syncRecentOrder();
   els.participantList.innerHTML = '';
   if (state.participants.length === 0) {
     if (!IS_OVERLAY) {
@@ -349,7 +374,8 @@ function renderParticipants() {
   const counts = new Map();
   state.participants.forEach((name) => counts.set(name, (counts.get(name) || 0) + 1));
 
-  counts.forEach((count, name) => {
+  [...state.recentOrder].reverse().forEach((name) => {
+    const count = counts.get(name);
     const li = document.createElement('li');
 
     const nameWrap = document.createElement('span');
@@ -2325,6 +2351,7 @@ function saveState() {
   try {
     const data = {
       participants: state.participants,
+      recentOrder: state.recentOrder,
       subNames: [...state.subNames],
       eliminatedLog: state.eliminatedLog,
       winnersLog: state.winnersLog,
@@ -2376,6 +2403,7 @@ async function applySavedState() {
   if (!data) return;
 
   state.participants = Array.isArray(data.participants) ? data.participants : [];
+  state.recentOrder = Array.isArray(data.recentOrder) ? data.recentOrder.filter((n) => typeof n === 'string') : [];
   state.subNames = new Set(Array.isArray(data.subNames) ? data.subNames : []);
   state.eliminatedLog = Array.isArray(data.eliminatedLog) ? data.eliminatedLog : [];
   state.winnersLog = Array.isArray(data.winnersLog) ? data.winnersLog : [];
@@ -2560,6 +2588,7 @@ function overlaySnapshot() {
   return {
     t: 'state',
     participants: state.participants,
+    recentOrder: state.recentOrder,
     subNames: [...state.subNames],
     eliminatedLog: state.eliminatedLog,
     winnersLog: state.winnersLog,
@@ -2708,6 +2737,7 @@ function initOverlayMode() {
 
 function applyOverlayState(m, keepRotation) {
   state.participants = m.participants;
+  state.recentOrder = Array.isArray(m.recentOrder) ? m.recentOrder : [];
   state.subNames = new Set(m.subNames);
   state.eliminatedLog = m.eliminatedLog;
   state.winnersLog = m.winnersLog;
