@@ -82,8 +82,8 @@
   "wheelFontSizeLabel": "Tamaño de letra de la ruleta",
   "duplicateTitle": "Duplicar (dar cupo extra)",
   "debugSubcategory": "Debug",
-  "debugModeLabel": "Modo debug (temporal, arrastra cajas/botones)",
-  "debugModeNote": "No se guarda: al recargar la página vuelve al orden normal.",
+  "debugModeLabel": "Modo debug: mover las cajas",
+  "debugModeNote": "Arrastra cada caja para colocarla donde quieras; se ajustan a una cuadrícula de 20 px y la disposición se guarda. Al mover una caja por primera vez, la página pasa a disposición libre.",
   "newThemeTitle": "Crear tema nuevo",
   "newThemeNamePlaceholder": "Nombre del tema",
   "newThemeBgLabel": "Imágenes de fondo",
@@ -183,5 +183,13 @@
   "soundPreviewTick": "Giro",
   "soundPreviewSelect": "Selección",
   "soundPreviewFinal": "Ganador final",
-  "fxGradient": "Degradado"
+  "fxGradient": "Degradado",
+  "resetLayoutBtn": "Restablecer disposición",
+  "layoutBoxWheel": "Ruleta",
+  "layoutBoxEliminated": "Eliminados",
+  "layoutBoxMessages": "Mensajes",
+  "layoutBoxParticipants": "Lista de participantes",
+  "layoutBoxControls": "Añadir participantes",
+  "layoutBoxWinners": "Ganadores",
+  "layoutBoxSettings": "Configuración"
 }

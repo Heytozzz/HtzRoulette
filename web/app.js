@@ -155,6 +155,7 @@ const els = {
   newThemeRouletteFiles: document.getElementById('newThemeRouletteFiles'),
   saveThemeBtn: document.getElementById('saveThemeBtn'),
   debugModeCheckbox: document.getElementById('debugModeCheckbox'),
+  resetLayoutBtn: document.getElementById('resetLayoutBtn'),
   overlayStatusText: document.getElementById('overlayStatusText'),
   cmdStatusText: document.getElementById('cmdStatusText'),
   cmdPrefixInput: document.getElementById('cmdPrefixInput'),
@@ -301,6 +302,7 @@ function applyWheelScale(scaleValue) {
   els.wheelCanvas.width = size;
   els.wheelCanvas.height = size;
   drawWheel();
+  refreshLayoutMetrics();
 }
 
 els.wheelScaleSlider.addEventListener('input', () => {
@@ -2479,50 +2481,202 @@ async function applySavedState() {
 
 // --- Debug mode: temporary drag-to-reorder for layout tuning (flex `order`,
 // so gaps/margins/padding stay exactly as configured; nothing is persisted) ---
-const DEBUG_CONTAINER_SELECTORS = ['main', '.left-column', '.participants', '.wheel-section', '.settings'];
-let debugDragSource = null;
+// --- Movable boxes (debug mode) ---
+// Every box can be dragged on its own. Positions snap to a grid so nothing ends
+// up misaligned, and they are saved in localStorage. Moving a box for the first
+// time switches the page from the flow layout to a free layout (each box gets
+// absolute left/top); "Restablecer disposición" goes back to the original one.
+const LAYOUT_KEY = 'htz_layout';
+const LAYOUT_GRID = 20;
+const LAYOUT_BOXES = [
+  { id: 'wheel', selector: '#wheelBox', labelKey: 'layoutBoxWheel' },
+  { id: 'eliminated', selector: '.eliminated-panel', labelKey: 'layoutBoxEliminated' },
+  { id: 'messages', selector: '#messagesBox', labelKey: 'layoutBoxMessages' },
+  { id: 'participants', selector: '.participants', labelKey: 'layoutBoxParticipants' },
+  { id: 'controls', selector: '.participants-controls', labelKey: 'layoutBoxControls' },
+  { id: 'winners', selector: '.logs-box', labelKey: 'layoutBoxWinners' },
+  { id: 'settings', selector: '.settings', labelKey: 'layoutBoxSettings' },
+];
+let layoutEditing = false;
+let layoutDrag = null;
+let layoutResizeObserver = null;
 
-function onDebugDragStart(e) {
-  debugDragSource = e.currentTarget;
-  e.dataTransfer.effectAllowed = 'move';
+const layoutMain = () => document.querySelector('main');
+const layoutBoxEl = (id) => document.querySelector(`[data-layout-id="${id}"]`);
+const snapToGrid = (value) => Math.round(value / LAYOUT_GRID) * LAYOUT_GRID;
+const isCustomLayout = () => document.body.classList.contains('custom-layout');
+
+// Keeps the free layout consistent: "Eliminados" is as tall as the wheel, and
+// the page is tall enough for the lowest box.
+function refreshLayoutMetrics() {
+  if (!isCustomLayout()) return;
+  const wheel = layoutBoxEl('wheel');
+  const eliminated = layoutBoxEl('eliminated');
+  if (wheel && eliminated) eliminated.style.height = `${wheel.offsetHeight}px`;
+  let bottom = 0;
+  LAYOUT_BOXES.forEach(({ id }) => {
+    const el = layoutBoxEl(id);
+    if (el) bottom = Math.max(bottom, el.offsetTop + el.offsetHeight);
+  });
+  layoutMain().style.minHeight = `${bottom + LAYOUT_GRID}px`;
 }
-function onDebugDragOver(e) {
-  e.preventDefault();
+
+function applyLayout(positions) {
+  document.body.classList.add('custom-layout');
+  LAYOUT_BOXES.forEach(({ id }) => {
+    const el = layoutBoxEl(id);
+    if (!el) return;
+    const pos = positions[id] || { x: 0, y: 0 };
+    el.style.left = `${pos.x}px`;
+    el.style.top = `${pos.y}px`;
+  });
+  if (typeof ResizeObserver !== 'undefined' && !layoutResizeObserver) {
+    layoutResizeObserver = new ResizeObserver(() => refreshLayoutMetrics());
+    LAYOUT_BOXES.forEach(({ id }) => {
+      const el = layoutBoxEl(id);
+      if (el) layoutResizeObserver.observe(el);
+    });
+  }
+  refreshLayoutMetrics();
 }
-function onDebugDrop(e) {
+
+// Turns the current flow layout into positions (snapped to the grid)
+function freezeLayout() {
+  const mainRect = layoutMain().getBoundingClientRect();
+  const positions = {};
+  LAYOUT_BOXES.forEach(({ id }) => {
+    const el = layoutBoxEl(id);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    positions[id] = {
+      x: Math.max(0, snapToGrid(rect.left - mainRect.left)),
+      y: Math.max(0, snapToGrid(rect.top - mainRect.top)),
+    };
+  });
+  applyLayout(positions);
+  saveLayout();
+}
+
+function saveLayout() {
+  if (!isCustomLayout()) return;
+  const boxes = {};
+  LAYOUT_BOXES.forEach(({ id }) => {
+    const el = layoutBoxEl(id);
+    if (el) boxes[id] = { x: parseInt(el.style.left, 10) || 0, y: parseInt(el.style.top, 10) || 0 };
+  });
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify({ version: 1, grid: LAYOUT_GRID, boxes }));
+  } catch (err) {
+    // Storage may be unavailable; the layout just won't persist
+  }
+}
+
+function loadLayout() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LAYOUT_KEY));
+    if (!data || typeof data.boxes !== 'object' || data.boxes === null) return null;
+    const positions = {};
+    LAYOUT_BOXES.forEach(({ id }) => {
+      const p = data.boxes[id];
+      if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+        positions[id] = { x: Math.max(0, Math.round(p.x)), y: Math.max(0, Math.round(p.y)) };
+      }
+    });
+    return Object.keys(positions).length ? positions : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function resetLayout() {
+  try {
+    localStorage.removeItem(LAYOUT_KEY);
+  } catch (err) {
+    // ignore
+  }
+  document.body.classList.remove('custom-layout');
+  LAYOUT_BOXES.forEach(({ id }) => {
+    const el = layoutBoxEl(id);
+    if (!el) return;
+    el.style.left = '';
+    el.style.top = '';
+    el.style.height = '';
+  });
+  layoutMain().style.minHeight = '';
+}
+
+function onLayoutPointerDown(e) {
+  if (!layoutEditing || e.button !== 0) return;
+  const box = e.currentTarget;
   e.preventDefault();
-  const target = e.currentTarget;
-  if (!debugDragSource || debugDragSource === target) return;
-  const tmp = debugDragSource.style.order;
-  debugDragSource.style.order = target.style.order;
-  target.style.order = tmp;
+  if (!isCustomLayout()) freezeLayout();
+  if (box.setPointerCapture) box.setPointerCapture(e.pointerId);
+  layoutDrag = {
+    box,
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    origX: parseInt(box.style.left, 10) || 0,
+    origY: parseInt(box.style.top, 10) || 0,
+  };
+  box.classList.add('layout-dragging');
+}
+
+function onLayoutPointerMove(e) {
+  if (!layoutDrag || layoutDrag.pointerId !== e.pointerId || layoutDrag.box !== e.currentTarget) return;
+  const { box } = layoutDrag;
+  const maxX = Math.max(0, Math.floor((layoutMain().clientWidth - box.offsetWidth) / LAYOUT_GRID) * LAYOUT_GRID);
+  const x = Math.min(maxX, Math.max(0, snapToGrid(layoutDrag.origX + e.clientX - layoutDrag.startX)));
+  const y = Math.max(0, snapToGrid(layoutDrag.origY + e.clientY - layoutDrag.startY));
+  box.style.left = `${x}px`;
+  box.style.top = `${y}px`;
+  refreshLayoutMetrics();
+}
+
+function onLayoutPointerUp(e) {
+  if (!layoutDrag || layoutDrag.pointerId !== e.pointerId || layoutDrag.box !== e.currentTarget) return;
+  const { box } = layoutDrag;
+  if (box.releasePointerCapture) {
+    try { box.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
+  }
+  box.classList.remove('layout-dragging');
+  layoutDrag = null;
+  saveLayout();
+  refreshLayoutMetrics();
+}
+
+function initLayoutBoxes() {
+  LAYOUT_BOXES.forEach(({ id, selector, labelKey }) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.classList.add('layout-box');
+    el.dataset.layoutId = id;
+    el.dataset.layoutLabel = t(labelKey);
+    el.addEventListener('pointerdown', onLayoutPointerDown);
+    el.addEventListener('pointermove', onLayoutPointerMove);
+    el.addEventListener('pointerup', onLayoutPointerUp);
+    el.addEventListener('pointercancel', onLayoutPointerUp);
+  });
+  // While editing, clicks on boxes must not trigger their actions (e.g. spinning the wheel)
+  document.addEventListener('click', (e) => {
+    if (layoutEditing && e.target.closest && e.target.closest('.layout-box')) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+  const saved = loadLayout();
+  if (saved) applyLayout(saved);
 }
 
 function setDebugMode(enabled) {
+  layoutEditing = enabled;
   document.body.classList.toggle('debug-mode', enabled);
-  DEBUG_CONTAINER_SELECTORS.forEach((sel) => {
-    const container = document.querySelector(sel);
-    if (!container) return;
-    Array.from(container.children).forEach((child, i) => {
-      if (enabled) {
-        if (!child.style.order) child.style.order = String(i);
-        child.draggable = true;
-        child.addEventListener('dragstart', onDebugDragStart);
-        child.addEventListener('dragover', onDebugDragOver);
-        child.addEventListener('drop', onDebugDrop);
-      } else {
-        child.draggable = false;
-        child.removeEventListener('dragstart', onDebugDragStart);
-        child.removeEventListener('dragover', onDebugDragOver);
-        child.removeEventListener('drop', onDebugDrop);
-      }
-    });
-  });
 }
 
 els.debugModeCheckbox.addEventListener('change', () => {
   setDebugMode(els.debugModeCheckbox.checked);
 });
+els.resetLayoutBtn.addEventListener('click', resetLayout);
 
 // --- OBS overlays ---
 // The control page (host) pushes its state to overlay pages over WebRTC
@@ -2843,6 +2997,7 @@ loadStrings().then(async () => {
     await applySavedState();
     renderSavedLists();
     loadSoundPack(state.soundPack);
+    initLayoutBoxes();
   }
   renderParticipants();
   renderLogs();

@@ -174,17 +174,6 @@ main {
   color: #8fef8f;
 }
 
-/* --- Debug mode: temporary drag-to-reorder for layout tuning --- */
-.debug-mode [draggable="true"] {
-  outline: 2px dashed #ffcc00;
-  outline-offset: 2px;
-  cursor: grab;
-}
-
-.debug-mode [draggable="true"]:active {
-  cursor: grabbing;
-}
-
 .participants ul {
   list-style: none;
   margin: 0;
@@ -666,3 +655,112 @@ body.sub-uppercase .sub-name { text-transform: uppercase; }
 }
 .participants li .sub-btn:hover { opacity: 0.85; }
 .participants li .sub-btn.active { opacity: 1; text-shadow: 0 0 5px rgba(255, 215, 0, 0.8); }
+
+/* --- Movable boxes (debug mode) --- */
+.wheel-stage {
+  position: relative;
+  display: flex;
+}
+
+.messages-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Free layout: the wrappers disappear and every box is positioned on its own
+   (left/top are set from JS, always multiples of the grid). */
+body.custom-layout main {
+  position: relative;
+  display: block;
+}
+
+body.custom-layout .left-column,
+body.custom-layout .wheel-section,
+body.custom-layout .wheel-stage {
+  display: contents;
+}
+
+body.custom-layout .layout-box {
+  position: absolute;
+  margin: 0;
+  z-index: 1;
+}
+
+body.custom-layout .participants,
+body.custom-layout .participants-controls,
+body.custom-layout .logs-box {
+  width: 280px;
+}
+
+body.custom-layout .settings {
+  width: 260px;
+  max-width: none;
+  flex: none;
+}
+
+body.custom-layout .eliminated-panel {
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: 160px;
+}
+
+body.custom-layout .messages-box {
+  min-width: 260px;
+}
+
+/* Constant heights so boxes below/next to them never get overlapped as lists grow */
+body.custom-layout .participants ul {
+  min-height: calc(32px * 12);
+}
+
+body.custom-layout .logs-box ul {
+  height: 120px;
+}
+
+/* Edit mode: grid, outlines and labels */
+body.debug-mode main {
+  background-image:
+    linear-gradient(rgba(255, 204, 0, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 204, 0, 0.12) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
+}
+
+body.debug-mode:not(.custom-layout) .layout-box:not(.eliminated-panel) {
+  position: relative;
+}
+
+body.debug-mode .layout-box {
+  outline: 2px dashed #ffcc00;
+  outline-offset: 2px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+body.debug-mode .layout-box > * {
+  pointer-events: none;
+}
+
+body.debug-mode .layout-box::before {
+  content: attr(data-layout-label);
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 40;
+  background: #ffcc00;
+  color: #111;
+  font: 600 11px/1 sans-serif;
+  padding: 3px 6px;
+  border-radius: 0 0 0 6px;
+  pointer-events: none;
+}
+
+body.debug-mode .layout-box.layout-dragging {
+  cursor: grabbing;
+  z-index: 30;
+  opacity: 0.9;
+}

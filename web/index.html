@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <header>
@@ -75,15 +75,19 @@
     </div>
 
     <section class="wheel-section">
-      <div id="wheelBox" class="wheel-box">
+      <div class="wheel-stage">
         <div class="eliminated-panel">
           <h3 data-i18n="eliminatedLog">Eliminados</h3>
           <ul id="eliminatedLogList"></ul>
         </div>
-        <canvas id="wheelCanvas" width="520" height="520"></canvas>
+        <div id="wheelBox" class="wheel-box">
+          <canvas id="wheelCanvas" width="520" height="520"></canvas>
+        </div>
       </div>
-      <div id="winnerText"></div>
-      <div id="modeStatus"></div>
+      <div id="messagesBox" class="messages-box">
+        <div id="winnerText"></div>
+        <div id="modeStatus"></div>
+      </div>
     </section>
 
     <section class="settings">
@@ -328,15 +332,16 @@
       <div class="settings-tab hidden" data-tab="debug" role="tabpanel">
       <label class="inline-label">
         <input id="debugModeCheckbox" type="checkbox" />
-        <span data-i18n="debugModeLabel">Modo debug (temporal, arrastra cajas/botones)</span>
+        <span data-i18n="debugModeLabel">Modo debug: mover las cajas</span>
       </label>
-      <p class="modal-note" data-i18n="debugModeNote">No se guarda: al recargar la página vuelve al orden normal.</p>
+      <p class="modal-note" data-i18n="debugModeNote">Nota</p>
+      <button id="resetLayoutBtn" class="small-btn" data-i18n="resetLayoutBtn">Restablecer disposición</button>
       </div>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
