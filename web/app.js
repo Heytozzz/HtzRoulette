@@ -469,8 +469,44 @@ function addParticipant(username, subTier) {
   for (let i = 0; i < copies; i += 1) {
     state.participants.push(username);
   }
+  requestParticipantsRender();
+}
+
+// Joins can arrive in bursts (hundreds of chatters typing !join at once) and each
+// full list + wheel rebuild gets slower as the crowd grows. The first join renders
+// right away; the ones that follow within PARTICIPANTS_FLUSH_MS are batched into a
+// single render, so a burst costs a handful of rebuilds instead of one per join.
+const PARTICIPANTS_FLUSH_MS = 80;
+let participantsFlushTimer = null;
+let participantsFlushDirty = false;
+
+function requestParticipantsRender() {
+  if (participantsFlushTimer !== null) {
+    participantsFlushDirty = true;
+    return;
+  }
   renderParticipants();
   drawWheel();
+  participantsFlushTimer = bgTimers.timeout(() => {
+    participantsFlushTimer = null;
+    if (participantsFlushDirty) {
+      participantsFlushDirty = false;
+      requestParticipantsRender();
+    }
+  }, PARTICIPANTS_FLUSH_MS);
+}
+
+// Renders any batched joins right now
+function flushParticipantsRender() {
+  if (participantsFlushTimer !== null) {
+    bgTimers.clear(participantsFlushTimer);
+    participantsFlushTimer = null;
+  }
+  if (participantsFlushDirty) {
+    participantsFlushDirty = false;
+    renderParticipants();
+    drawWheel();
+  }
 }
 
 // Manual add: allows duplicates on purpose, so sub-bonus extra entries work
@@ -628,6 +664,7 @@ els.twitchClientSecret.addEventListener('change', () => {
 
 // --- Wheel drawing ---
 function drawWheel() {
+  subStyleKeyCached = null; // colors/styles may have changed since the last frame
   const { width, height } = els.wheelCanvas;
   const cx = width / 2;
   const cy = height / 2;
@@ -665,11 +702,25 @@ function drawUserText(text, x, y, fontSize) {
     ctx.fillText(text, x, y);
     return;
   }
+  const offset = Math.max(1.5, fontSize * 0.1);
+  if (state.participants.length > 80) {
+    // Crowded wheel: a blurred shadow per name is too slow, so draw a plain dark copy
+    // shifted in screen space (the offset is rotated into the text's own frame).
+    const m = ctx.getTransform();
+    const det = m.a * m.d - m.b * m.c || 1;
+    const lx = (m.d * offset - m.c * offset) / det;
+    const ly = (-m.b * offset + m.a * offset) / det;
+    ctx.fillStyle = state.userShadow.color;
+    ctx.fillText(text, x + lx, y + ly);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(text, x, y);
+    return;
+  }
   ctx.save();
   ctx.shadowColor = state.userShadow.color;
   ctx.shadowBlur = Math.max(3, fontSize * 0.25);
-  ctx.shadowOffsetX = Math.max(1.5, fontSize * 0.1);
-  ctx.shadowOffsetY = Math.max(1.5, fontSize * 0.1);
+  ctx.shadowOffsetX = offset;
+  ctx.shadowOffsetY = offset;
   ctx.fillText(text, x, y);
   ctx.restore();
 }
@@ -709,23 +760,12 @@ function subFontString(fontSize) {
   return `${st.italic ? 'italic ' : ''}${st.bold ? 'bold ' : ''}${fontSize}px Segoe UI`;
 }
 
-// Sub names on the wheel: optional badge (gold crown or channel sub icon), then
-// the name with an outline + glow + fill (each with its own color), font
-// styles and animated effects. `slot` is the wheel position, used so the
-// effects are not all in sync.
-function drawSubText(name, x, y, fontSize, slot) {
-  const fx = state.subEffects;
-  const st = state.subStyles;
-  const text = st.uppercase ? name.toUpperCase() : name;
-  const time = performance.now() / 1000;
-  const phase = slot * 0.9;
+const NO_EFFECTS = { bounce: false, wave: false, blink: false, glitch: false, rainbow: false, gradient: false };
 
-  ctx.save();
-  ctx.font = subFontString(fontSize);
-  ctx.textAlign = 'left';
-  ctx.lineJoin = 'round';
-  ctx.miterLimit = 2;
-
+// Measures a sub's name and badge (gold crown or channel sub icon) with context g
+function layoutSubText(g, name, fontSize) {
+  const text = state.subStyles.uppercase ? name.toUpperCase() : name;
+  g.font = subFontString(fontSize);
   let badge = null;
   if (state.subCrown === 'crown') {
     badge = { kind: 'crown' };
@@ -734,24 +774,42 @@ function drawSubText(name, x, y, fontSize, slot) {
     if (img) badge = { kind: 'image', img };
     else if (!state.subBadgeUrl) badge = { kind: 'crown' }; // no icon configured: fall back to the crown
   }
-  const gap = fontSize * 0.25;
   const crownFont = `${Math.round(fontSize * 1.15)}px Segoe UI`;
   let badgeSize = 0;
   if (badge && badge.kind === 'image') {
     badgeSize = fontSize * 1.15;
   } else if (badge) {
-    ctx.font = crownFont;
-    badgeSize = ctx.measureText('\u2655').width;
-    ctx.font = subFontString(fontSize);
+    g.font = crownFont;
+    badgeSize = g.measureText('\u2655').width;
+    g.font = subFontString(fontSize);
   }
-  const badgeW = badge ? badgeSize + gap : 0;
-  const textW = ctx.measureText(text).width;
+  const badgeW = badge ? badgeSize + fontSize * 0.25 : 0;
+  return { text, badge, badgeSize, badgeW, crownFont, textW: g.measureText(text).width };
+}
+
+// Draws a sub's name on context g: optional badge, then the name with an outline +
+// glow + fill (each with its own color), font styles and animated effects.
+// `slot` is the wheel position, used so the effects are not all in sync.
+// opts.staticOnly ignores the animated effects (used to build cached sprites);
+// opts.lite uses a cheaper glow (one pass, smaller blur) for crowded wheels.
+function renderSubText(g, name, x, y, fontSize, slot, opts = {}) {
+  const fx = opts.staticOnly ? NO_EFFECTS : state.subEffects;
+  const st = state.subStyles;
+  const time = performance.now() / 1000;
+  const phase = slot * 0.9;
+
+  g.save();
+  g.textAlign = 'left';
+  g.lineJoin = 'round';
+  g.miterLimit = 2;
+
+  const { text, badge, badgeSize, badgeW, crownFont, textW } = layoutSubText(g, name, fontSize);
   const startX = x - badgeW - textW;
   const textX = startX + badgeW;
 
   const chars = [...text];
   const perChar = fx.wave || fx.rainbow || fx.gradient;
-  const charX = perChar ? chars.map((_, i) => ctx.measureText(chars.slice(0, i).join('')).width) : null;
+  const charX = perChar ? chars.map((_, i) => g.measureText(chars.slice(0, i).join('')).width) : null;
   const waveY = (i) => (fx.wave ? Math.sin(time * 4 + i * 0.7 + phase) * fontSize * 0.2 : 0);
   const rainbow = (i) => `hsl(${Math.floor((time * 140 + i * 35 + phase * 40) % 360)}, 100%, 60%)`;
   // Gradient: a band of light flowing through the letters, in the theme's color
@@ -763,20 +821,20 @@ function drawSubText(name, x, y, fontSize, slot) {
   };
 
   const baseY = y + (fx.bounce ? -Math.abs(Math.sin(time * 5 + phase)) * fontSize * 0.4 : 0);
-  ctx.globalAlpha = fx.blink && Math.sin(time * 6 + phase) <= -0.2 ? 0.15 : 1;
+  g.globalAlpha = fx.blink && Math.sin(time * 6 + phase) <= -0.2 ? 0.15 : 1;
 
   const strokeText = (ox, oy) => {
-    if (!perChar) ctx.strokeText(text, textX + ox, baseY + oy);
-    else chars.forEach((ch, i) => ctx.strokeText(ch, textX + ox + charX[i], baseY + oy + waveY(i)));
+    if (!perChar) g.strokeText(text, textX + ox, baseY + oy);
+    else chars.forEach((ch, i) => g.strokeText(ch, textX + ox + charX[i], baseY + oy + waveY(i)));
   };
   const fillText = (ox, oy, colorAt) => {
     if (!perChar) {
-      ctx.fillStyle = colorAt(0);
-      ctx.fillText(text, textX + ox, baseY + oy);
+      g.fillStyle = colorAt(0);
+      g.fillText(text, textX + ox, baseY + oy);
     } else {
       chars.forEach((ch, i) => {
-        ctx.fillStyle = colorAt(i);
-        ctx.fillText(ch, textX + ox + charX[i], baseY + oy + waveY(i));
+        g.fillStyle = colorAt(i);
+        g.fillText(ch, textX + ox + charX[i], baseY + oy + waveY(i));
       });
     }
   };
@@ -795,16 +853,16 @@ function drawSubText(name, x, y, fontSize, slot) {
     my = gy;
   }
 
-  // Outline + glow
-  ctx.lineWidth = Math.max(3, fontSize * 0.2);
-  ctx.strokeStyle = getSubStrokeColor();
-  ctx.shadowColor = getSubGlowColor();
-  ctx.shadowBlur = Math.max(10, fontSize * 0.6);
+  // Outline + glow (blurred shadows are the expensive part of this whole function)
+  g.lineWidth = Math.max(3, fontSize * 0.2);
+  g.strokeStyle = getSubStrokeColor();
+  g.shadowColor = getSubGlowColor();
+  g.shadowBlur = opts.lite ? Math.max(6, fontSize * 0.35) : Math.max(10, fontSize * 0.6);
   strokeText(mx, my);
-  strokeText(mx, my); // second pass makes the glow stronger
+  if (!opts.lite) strokeText(mx, my); // second pass makes the glow stronger
 
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'transparent';
+  g.shadowBlur = 0;
+  g.shadowColor = 'transparent';
 
   // Glitch ghosts: cyan/magenta copies shifted sideways, between outline and fill
   if (glitching) {
@@ -817,14 +875,14 @@ function drawSubText(name, x, y, fontSize, slot) {
 
   // Underline / strikethrough
   if (st.underline || st.strike) {
-    ctx.fillStyle = fillColor(0);
-    ctx.shadowColor = getSubGlowColor();
-    ctx.shadowBlur = fontSize * 0.3;
+    g.fillStyle = fillColor(0);
+    g.shadowColor = getSubGlowColor();
+    g.shadowBlur = fontSize * 0.3;
     const thick = Math.max(1.5, fontSize * 0.08);
-    if (st.underline) ctx.fillRect(textX + mx, baseY + my + fontSize * 0.16, textW, thick);
-    if (st.strike) ctx.fillRect(textX + mx, baseY + my - fontSize * 0.3, textW, thick);
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
+    if (st.underline) g.fillRect(textX + mx, baseY + my + fontSize * 0.16, textW, thick);
+    if (st.strike) g.fillRect(textX + mx, baseY + my - fontSize * 0.3, textW, thick);
+    g.shadowBlur = 0;
+    g.shadowColor = 'transparent';
   }
 
   // Badge
@@ -832,29 +890,105 @@ function drawSubText(name, x, y, fontSize, slot) {
     const bx = startX + mx;
     const by = baseY + my + waveY(0);
     if (badge.kind === 'crown') {
-      ctx.font = crownFont;
-      ctx.lineWidth = Math.max(2, fontSize * 0.14);
-      ctx.strokeStyle = getSubStrokeColor();
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur = fontSize * 0.35;
-      ctx.strokeText('\u2655', bx, by);
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = 'transparent';
-      ctx.fillStyle = '#ffd700';
-      ctx.fillText('\u2655', bx, by);
+      g.font = crownFont;
+      g.lineWidth = Math.max(2, fontSize * 0.14);
+      g.strokeStyle = getSubStrokeColor();
+      g.shadowColor = '#ffd700';
+      g.shadowBlur = fontSize * 0.35;
+      g.strokeText('\u2655', bx, by);
+      g.shadowBlur = 0;
+      g.shadowColor = 'transparent';
+      g.fillStyle = '#ffd700';
+      g.fillText('\u2655', bx, by);
     } else {
-      ctx.shadowColor = getSubGlowColor();
-      ctx.shadowBlur = fontSize * 0.3;
-      ctx.drawImage(badge.img, bx, by - fontSize * 0.3 - badgeSize / 2, badgeSize, badgeSize);
+      g.shadowColor = getSubGlowColor();
+      g.shadowBlur = fontSize * 0.3;
+      g.drawImage(badge.img, bx, by - fontSize * 0.3 - badgeSize / 2, badgeSize, badgeSize);
     }
   }
-  ctx.restore();
+  g.restore();
+}
+
+// Performance with big crowds: re-rendering every sub's blurred glow on every
+// frame is what makes a crowded wheel lag. When there are many participants and
+// no per-letter animation, each name is rendered once into a small sprite and then
+// just blitted every frame. (1x on purpose: drawing a 2x sprite scaled down was
+// measured to be about 5x slower than blitting a 1x one.)
+const SUB_SPRITE_SCALE = 1;
+const SUB_SPRITE_MIN_PARTICIPANTS = 60;
+// Sprites are only used while every sub fits in the cache: with more subs than
+// this they would be evicted and rebuilt on every frame, which is slower than drawing directly.
+const SUB_SPRITE_MAX = 1500;
+const subSprites = new Map();
+let subMeasureCtx = null;
+let subStyleKeyCached = null; // same for every sub in a frame, so it is built once per drawWheel
+
+function computeSubStyleKey() {
+  const st = state.subStyles;
+  return [
+    st.bold, st.italic, st.underline, st.strike, st.uppercase,
+    getSubFillColor(), getSubStrokeColor(), getSubGlowColor(),
+    state.subCrown, state.subCrown === 'icon' ? state.subBadgeUrl : '',
+  ].join('|');
+}
+
+function getSubSprite(name, fontSize) {
+  // An icon that is still loading must not be cached as "no badge"
+  if (state.subCrown === 'icon' && state.subBadgeUrl && !getLoadedImage(state.subBadgeUrl)) return null;
+  if (subStyleKeyCached === null) subStyleKeyCached = computeSubStyleKey();
+  const key = `${name}|${fontSize}|${subStyleKeyCached}`;
+  let sprite = subSprites.get(key);
+  if (sprite) return sprite;
+
+  if (!subMeasureCtx) subMeasureCtx = document.createElement('canvas').getContext('2d');
+  const layout = layoutSubText(subMeasureCtx, name, fontSize);
+  const pad = Math.ceil(Math.max(10, fontSize * 0.6) * 1.7 + Math.max(3, fontSize * 0.2));
+  const ascent = Math.ceil(fontSize * 1.05);
+  const width = Math.ceil(layout.badgeW + layout.textW + pad * 2);
+  const height = ascent + Math.ceil(fontSize * 0.4) + pad * 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = width * SUB_SPRITE_SCALE;
+  canvas.height = height * SUB_SPRITE_SCALE;
+  const g = canvas.getContext('2d');
+  g.scale(SUB_SPRITE_SCALE, SUB_SPRITE_SCALE);
+  const anchorX = width - pad; // where the right end of the name goes
+  const anchorY = pad + ascent; // baseline
+  renderSubText(g, name, anchorX, anchorY, fontSize, 0, { staticOnly: true });
+  sprite = { canvas, width, height, anchorX, anchorY };
+  if (subSprites.size >= SUB_SPRITE_MAX) subSprites.clear();
+  subSprites.set(key, sprite);
+  return sprite;
+}
+
+function drawSubText(name, x, y, fontSize, slot) {
+  const fx = state.subEffects;
+  const perLetterEffect = fx.wave || fx.rainbow || fx.gradient || fx.glitch;
+  const crowded = state.participants.length >= SUB_SPRITE_MIN_PARTICIPANTS;
+  if (crowded && !perLetterEffect && state.subNames.size <= SUB_SPRITE_MAX) {
+    const sprite = getSubSprite(name, fontSize);
+    if (sprite) {
+      // Jump and blink don't change the shape, so they are just a shift/alpha on the sprite
+      const time = performance.now() / 1000;
+      const phase = slot * 0.9;
+      const dy = fx.bounce ? -Math.abs(Math.sin(time * 5 + phase)) * fontSize * 0.4 : 0;
+      const dim = fx.blink && Math.sin(time * 6 + phase) <= -0.2;
+      if (dim) {
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+      }
+      ctx.drawImage(sprite.canvas, x - sprite.anchorX, y + dy - sprite.anchorY, sprite.width, sprite.height);
+      if (dim) ctx.restore();
+      return;
+    }
+  }
+  renderSubText(ctx, name, x, y, fontSize, slot, { lite: crowded });
 }
 
 // Redraw the wheel continuously while a sub effect is on (the spin loop already
 // redraws every frame while spinning). Throttled to save CPU.
 let effectsRaf = null;
 let lastEffectDraw = 0;
+let effectsInterval = 33;
 
 function subEffectsActive() {
   return SUB_EFFECT_KEYS.some((k) => state.subEffects[k])
@@ -864,10 +998,12 @@ function subEffectsActive() {
 function effectsTick(now) {
   effectsRaf = null;
   if (!subEffectsActive()) return;
-  const interval = state.participants.length > 40 ? 50 : 33;
-  if (!state.animating && now - lastEffectDraw >= interval) {
+  if (!state.animating && now - lastEffectDraw >= effectsInterval) {
     lastEffectDraw = now;
+    const started = performance.now();
     drawWheel();
+    // Never spend more than about a third of the time drawing: a heavy wheel just animates at a lower frame rate
+    effectsInterval = Math.max(state.participants.length > 40 ? 50 : 33, (performance.now() - started) * 3);
   }
   if (effectsRaf === null) effectsRaf = requestAnimationFrame(effectsTick);
 }
@@ -884,30 +1020,30 @@ function drawColorSlices(cx, cy, radius, count, names) {
 
   for (let i = 0; i < count; i += 1) {
     const start = i * sliceAngle;
-    const end = start + sliceAngle;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.arc(0, 0, radius, start, end);
+    ctx.arc(0, 0, radius, start, start + sliceAngle);
     ctx.closePath();
     ctx.fillStyle = getSliceColor(i, count);
     ctx.fill();
-
-    if (names[i]) {
-      ctx.save();
-      ctx.rotate(start + sliceAngle / 2);
-      ctx.textAlign = 'right';
-      const isSub = state.subNames.has(names[i]);
-      const fontSize = Math.round(21 * state.wheelFontScale);
-      ctx.font = `${fontSize}px Segoe UI`;
-      if (isSub) {
-        clipToWheelDisc(radius);
-        drawSubText(names[i], radius - 10, 4, fontSize, i);
-      } else {
-        drawUserText(names[i], radius - 10, 4, fontSize);
-      }
-      ctx.restore();
-    }
   }
+
+  // Names in a second pass: a sub's glow is no longer painted over by the next
+  // slice, and a single clip to the wheel's disc serves every name.
+  ctx.save();
+  clipToWheelDisc(radius);
+  const fontSize = Math.round(21 * state.wheelFontScale);
+  ctx.font = `${fontSize}px Segoe UI`;
+  ctx.textAlign = 'right';
+  for (let i = 0; i < count; i += 1) {
+    if (!names[i]) continue;
+    ctx.save();
+    ctx.rotate(i * sliceAngle + sliceAngle / 2);
+    if (state.subNames.has(names[i])) drawSubText(names[i], radius - 10, 4, fontSize, i);
+    else drawUserText(names[i], radius - 10, 4, fontSize);
+    ctx.restore();
+  }
+  ctx.restore();
   ctx.restore();
 }
 
