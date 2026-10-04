@@ -156,6 +156,29 @@ const els = {
   saveThemeBtn: document.getElementById('saveThemeBtn'),
   debugModeCheckbox: document.getElementById('debugModeCheckbox'),
   resetLayoutBtn: document.getElementById('resetLayoutBtn'),
+  timerBtn: document.getElementById('timerBtn'),
+  timerWidget: document.getElementById('timerWidget'),
+  timerHeader: document.getElementById('timerHeader'),
+  timerCloseBtn: document.getElementById('timerCloseBtn'),
+  timerIdle: document.getElementById('timerIdle'),
+  timerPicker: document.getElementById('timerPicker'),
+  timerRun: document.getElementById('timerRun'),
+  timerCustomBtn: document.getElementById('timerCustomBtn'),
+  timerPickerStart: document.getElementById('timerPickerStart'),
+  timerPickerCancel: document.getElementById('timerPickerCancel'),
+  timerDisplay: document.getElementById('timerDisplay'),
+  timerProgressBar: document.getElementById('timerProgressBar'),
+  timerStatus: document.getElementById('timerStatus'),
+  timerPauseBtn: document.getElementById('timerPauseBtn'),
+  timerRepeatBtn: document.getElementById('timerRepeatBtn'),
+  timerCancelBtn: document.getElementById('timerCancelBtn'),
+  timerShowCheckbox: document.getElementById('timerShowCheckbox'),
+  timerAlarmCheckbox: document.getElementById('timerAlarmCheckbox'),
+  timerAlarmTestBtn: document.getElementById('timerAlarmTestBtn'),
+  timerActShuffle: document.getElementById('timerActShuffle'),
+  timerActCloseJoin: document.getElementById('timerActCloseJoin'),
+  timerActOpenJoin: document.getElementById('timerActOpenJoin'),
+  timerActSpin: document.getElementById('timerActSpin'),
   overlayStatusText: document.getElementById('overlayStatusText'),
   cmdStatusText: document.getElementById('cmdStatusText'),
   cmdPrefixInput: document.getElementById('cmdPrefixInput'),
@@ -2814,6 +2837,393 @@ els.debugModeCheckbox.addEventListener('change', () => {
 });
 els.resetLayoutBtn.addEventListener('click', resetLayout);
 
+// --- Timer widget ---
+// A floating countdown (30s / 1m / 5m / custom). When it ends it sounds an alarm and
+// can optionally run actions (shuffle, close/open joins, spin). By default it only
+// sounds the alarm. The countdown is driven by a worker timer and a monotonic clock,
+// so it keeps running when the tab is in the background.
+const TIMER_KEY = 'htz_timer';
+const TIMER_TICK_MS = 200;
+const TIMER_MAX_SECONDS = 24 * 3600 - 1;
+const timerSettings = {
+  visible: false,
+  alarm: true,
+  actions: { shuffle: false, closeJoin: false, openJoin: false, spin: false },
+  pos: null, // { x, y } in viewport px, always on the grid
+  custom: { h: 0, m: 2, s: 0 }, // last value picked with "..."
+};
+const timer = { status: 'idle', totalMs: 0, endAt: 0, remainingMs: 0, tickId: null, doneText: '' };
+const TIMER_ACTION_IDS = {
+  shuffle: 'timerActShuffle',
+  closeJoin: 'timerActCloseJoin',
+  openJoin: 'timerActOpenJoin',
+  spin: 'timerActSpin',
+};
+const TIMER_PICKER_MAX = { h: 23, m: 59, s: 59 };
+const timerPickerValue = { h: 0, m: 0, s: 0 };
+const timerBaseTitle = document.title;
+let timerDrag = null;
+
+function saveTimerSettings() {
+  try {
+    localStorage.setItem(TIMER_KEY, JSON.stringify(timerSettings));
+  } catch (err) {
+    // Storage may be unavailable; settings just won't persist
+  }
+}
+
+function loadTimerSettings() {
+  try {
+    const data = JSON.parse(localStorage.getItem(TIMER_KEY));
+    if (!data || typeof data !== 'object') return;
+    timerSettings.visible = !!data.visible;
+    timerSettings.alarm = data.alarm !== false;
+    Object.keys(timerSettings.actions).forEach((k) => {
+      timerSettings.actions[k] = !!(data.actions && data.actions[k]);
+    });
+    if (timerSettings.actions.closeJoin && timerSettings.actions.openJoin) timerSettings.actions.openJoin = false;
+    if (data.pos && Number.isFinite(data.pos.x) && Number.isFinite(data.pos.y)) {
+      timerSettings.pos = { x: data.pos.x, y: data.pos.y };
+    }
+    if (data.custom) {
+      const clamp = (v, max) => Math.min(max, Math.max(0, Math.floor(Number(v)) || 0));
+      timerSettings.custom = {
+        h: clamp(data.custom.h, TIMER_PICKER_MAX.h),
+        m: clamp(data.custom.m, TIMER_PICKER_MAX.m),
+        s: clamp(data.custom.s, TIMER_PICKER_MAX.s),
+      };
+    }
+  } catch (err) {
+    // Unreadable data: keep the defaults
+  }
+}
+
+function formatTimer(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+function showTimerView(view) {
+  els.timerIdle.hidden = view !== 'idle';
+  els.timerPicker.hidden = view !== 'picker';
+  els.timerRun.hidden = view !== 'run';
+}
+
+function renderTimer() {
+  const { status } = timer;
+  const remaining = status === 'running' ? Math.max(0, timer.endAt - performance.now()) : timer.remainingMs;
+  const text = formatTimer(remaining);
+  els.timerDisplay.textContent = text;
+  els.timerProgressBar.style.width = timer.totalMs
+    ? `${Math.max(0, Math.min(100, (remaining / timer.totalMs) * 100))}%`
+    : '0%';
+  els.timerWidget.dataset.status = status;
+  els.timerPauseBtn.hidden = status === 'finished';
+  els.timerRepeatBtn.hidden = status !== 'finished';
+  els.timerPauseBtn.textContent = t(status === 'paused' ? 'timerResume' : 'timerPause');
+  els.timerCancelBtn.textContent = t(status === 'finished' ? 'timerClose' : 'timerCancel');
+  if (status === 'paused') els.timerStatus.textContent = t('timerPausedLabel');
+  else if (status === 'finished') els.timerStatus.textContent = [t('timerTimeUp'), timer.doneText].filter(Boolean).join(' · ');
+  else els.timerStatus.textContent = '';
+
+  // Visible even when the widget is hidden or the tab is in the background
+  const counting = status === 'running' || status === 'paused';
+  els.timerBtn.textContent = counting ? `⏱ ${text}` : '⏱';
+  els.timerBtn.classList.toggle('timer-active', counting);
+  document.title = counting ? `⏱ ${text} · ${timerBaseTitle}` : timerBaseTitle;
+}
+
+function stopTimerTick() {
+  if (timer.tickId !== null) {
+    bgTimers.clear(timer.tickId);
+    timer.tickId = null;
+  }
+}
+
+function timerTick() {
+  if (timer.status !== 'running') return;
+  if (timer.endAt - performance.now() <= 0) finishTimer();
+  else renderTimer();
+}
+
+function startTimer(seconds) {
+  const sec = Math.max(1, Math.min(TIMER_MAX_SECONDS, Math.floor(seconds)));
+  stopTimerTick();
+  timer.status = 'running';
+  timer.totalMs = sec * 1000;
+  timer.remainingMs = timer.totalMs;
+  timer.endAt = performance.now() + timer.totalMs;
+  timer.doneText = '';
+  timer.tickId = bgTimers.interval(timerTick, TIMER_TICK_MS);
+  try {
+    getAudioCtx(); // create/unlock audio now, inside the click, so the alarm can sound later
+  } catch (err) {
+    // Audio unavailable
+  }
+  showTimerView('run');
+  renderTimer();
+}
+
+function pauseTimer() {
+  if (timer.status !== 'running') return;
+  timer.remainingMs = Math.max(0, timer.endAt - performance.now());
+  timer.status = 'paused';
+  stopTimerTick();
+  renderTimer();
+}
+
+function resumeTimer() {
+  if (timer.status !== 'paused') return;
+  timer.endAt = performance.now() + timer.remainingMs;
+  timer.status = 'running';
+  timer.tickId = bgTimers.interval(timerTick, TIMER_TICK_MS);
+  renderTimer();
+}
+
+function cancelTimer() {
+  stopTimerTick();
+  timer.status = 'idle';
+  timer.remainingMs = 0;
+  timer.totalMs = 0;
+  timer.doneText = '';
+  showTimerView('idle');
+  renderTimer();
+}
+
+// Runs the configured actions in a fixed order: shuffle, joins, spin.
+// Returns what was done (for the status line).
+function runTimerActions() {
+  const a = timerSettings.actions;
+  const done = [];
+  if (a.shuffle) {
+    if (!state.animating && state.participants.length > 1) {
+      shuffleParticipants();
+      done.push(t('timerDoShuffle'));
+    }
+  }
+  if (a.closeJoin) {
+    setJoinAccepted(false);
+    done.push(t('timerDoCloseJoin'));
+  }
+  if (a.openJoin) {
+    setJoinAccepted(true);
+    done.push(t('timerDoOpenJoin'));
+  }
+  if (a.spin) {
+    if (state.spinning) done.push(t('timerSpinBusy'));
+    else if (state.participants.length === 0) done.push(t('timerSpinEmpty'));
+    else {
+      spin();
+      done.push(t('timerDoSpin'));
+    }
+  }
+  return done;
+}
+
+function scheduleAlarmBeep(ctx, when, freq) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, when);
+  gain.gain.linearRampToValueAtTime(0.28, when + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.15);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(when);
+  osc.stop(when + 0.16);
+}
+
+// Three groups of three beeps (about 2.7 s), scheduled on the audio clock
+function playAlarm() {
+  try {
+    const ctx = getAudioCtx();
+    const start = () => {
+      const t0 = ctx.currentTime + 0.05;
+      for (let group = 0; group < 3; group += 1) {
+        for (let beep = 0; beep < 3; beep += 1) {
+          scheduleAlarmBeep(ctx, t0 + group * 0.9 + beep * 0.2, beep === 2 ? 1319 : 988);
+        }
+      }
+    };
+    if (ctx.state === 'running') start();
+    else ctx.resume().then(start).catch(() => {});
+  } catch (err) {
+    // Audio unavailable
+  }
+}
+
+function finishTimer() {
+  stopTimerTick();
+  timer.status = 'finished';
+  timer.remainingMs = 0;
+  const done = runTimerActions();
+  timer.doneText = done.length ? t('timerDoneActions', { list: done.join(', ') }) : '';
+  if (timerSettings.alarm) playAlarm();
+  if (!timerSettings.visible) setTimerVisible(true); // make sure the "time's up" is seen
+  showTimerView('run');
+  renderTimer();
+}
+
+// ---- time picker (hours : minutes : seconds, like the Windows one) ----
+function renderTimerPicker() {
+  els.timerPicker.querySelectorAll('.timer-col').forEach((col) => {
+    const unit = col.dataset.unit;
+    const size = TIMER_PICKER_MAX[unit] + 1;
+    const items = col.querySelector('.timer-col-items');
+    items.innerHTML = '';
+    for (let offset = -2; offset <= 2; offset += 1) {
+      const value = (timerPickerValue[unit] + offset + size) % size;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `timer-col-item${offset === 0 ? ' selected' : ''}`;
+      btn.dataset.offset = String(offset);
+      btn.textContent = String(value).padStart(2, '0');
+      btn.addEventListener('click', () => {
+        timerPickerValue[unit] = value;
+        renderTimerPicker();
+      });
+      items.appendChild(btn);
+    }
+  });
+  els.timerPickerStart.disabled = timerPickerValue.h + timerPickerValue.m + timerPickerValue.s === 0;
+}
+
+function stepTimerPicker(unit, dir) {
+  const size = TIMER_PICKER_MAX[unit] + 1;
+  timerPickerValue[unit] = (timerPickerValue[unit] + dir + size) % size;
+  renderTimerPicker();
+}
+
+function openTimerPicker() {
+  Object.assign(timerPickerValue, timerSettings.custom);
+  renderTimerPicker();
+  showTimerView('picker');
+}
+
+function startFromTimerPicker() {
+  const { h, m, s } = timerPickerValue;
+  if (h + m + s === 0) return;
+  timerSettings.custom = { h, m, s };
+  saveTimerSettings();
+  startTimer(h * 3600 + m * 60 + s);
+}
+
+// ---- floating window: position (on the grid), drag, visibility ----
+function placeTimerWidget(x, y) {
+  const rect = els.timerWidget.getBoundingClientRect();
+  const maxX = Math.max(0, window.innerWidth - rect.width);
+  const maxY = Math.max(0, window.innerHeight - rect.height);
+  const fallback = { x: window.innerWidth - rect.width - 40, y: 140 };
+  const pos = timerSettings.pos || fallback;
+  const nx = Math.min(maxX, Math.max(0, snapToGrid(x === undefined ? pos.x : x)));
+  const ny = Math.min(maxY, Math.max(0, snapToGrid(y === undefined ? pos.y : y)));
+  els.timerWidget.style.left = `${nx}px`;
+  els.timerWidget.style.top = `${ny}px`;
+  return { x: nx, y: ny };
+}
+
+function setTimerVisible(visible) {
+  timerSettings.visible = visible;
+  els.timerWidget.hidden = !visible;
+  els.timerShowCheckbox.checked = visible;
+  els.timerBtn.classList.toggle('active', visible);
+  if (visible) placeTimerWidget();
+  saveTimerSettings();
+}
+
+function initTimer() {
+  loadTimerSettings();
+  els.timerAlarmCheckbox.checked = timerSettings.alarm;
+  Object.entries(TIMER_ACTION_IDS).forEach(([key, id]) => {
+    els[id].checked = timerSettings.actions[key];
+  });
+
+  els.timerBtn.addEventListener('click', () => setTimerVisible(!timerSettings.visible));
+  els.timerCloseBtn.addEventListener('click', () => setTimerVisible(false));
+  els.timerShowCheckbox.addEventListener('change', () => setTimerVisible(els.timerShowCheckbox.checked));
+  els.timerAlarmCheckbox.addEventListener('change', () => {
+    timerSettings.alarm = els.timerAlarmCheckbox.checked;
+    saveTimerSettings();
+  });
+  els.timerAlarmTestBtn.addEventListener('click', playAlarm);
+  Object.entries(TIMER_ACTION_IDS).forEach(([key, id]) => {
+    els[id].addEventListener('change', () => {
+      timerSettings.actions[key] = els[id].checked;
+      // "stop joins" and "accept joins" contradict each other
+      if (els[id].checked && key === 'closeJoin') {
+        timerSettings.actions.openJoin = false;
+        els.timerActOpenJoin.checked = false;
+      }
+      if (els[id].checked && key === 'openJoin') {
+        timerSettings.actions.closeJoin = false;
+        els.timerActCloseJoin.checked = false;
+      }
+      saveTimerSettings();
+    });
+  });
+
+  els.timerWidget.querySelectorAll('[data-seconds]').forEach((btn) => {
+    btn.addEventListener('click', () => startTimer(Number(btn.dataset.seconds)));
+  });
+  els.timerCustomBtn.addEventListener('click', openTimerPicker);
+  els.timerPickerStart.addEventListener('click', startFromTimerPicker);
+  els.timerPickerCancel.addEventListener('click', () => showTimerView('idle'));
+  els.timerPauseBtn.addEventListener('click', () => (timer.status === 'paused' ? resumeTimer() : pauseTimer()));
+  els.timerRepeatBtn.addEventListener('click', () => startTimer(timer.totalMs / 1000));
+  els.timerCancelBtn.addEventListener('click', cancelTimer);
+
+  els.timerPicker.querySelectorAll('.timer-col').forEach((col) => {
+    const unit = col.dataset.unit;
+    col.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      stepTimerPicker(unit, e.deltaY > 0 ? 1 : -1);
+    }, { passive: false });
+    col.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); stepTimerPicker(unit, -1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); stepTimerPicker(unit, 1); }
+    });
+    col.querySelectorAll('.timer-col-arrow').forEach((arrow) => {
+      arrow.addEventListener('click', () => stepTimerPicker(unit, Number(arrow.dataset.dir)));
+    });
+  });
+  els.timerPicker.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') startFromTimerPicker();
+    if (e.key === 'Escape') showTimerView('idle');
+  });
+
+  // Drag by the title bar; positions snap to the same grid as the other boxes
+  els.timerHeader.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    const rect = els.timerWidget.getBoundingClientRect();
+    timerDrag = { id: e.pointerId, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    els.timerHeader.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  els.timerHeader.addEventListener('pointermove', (e) => {
+    if (!timerDrag || timerDrag.id !== e.pointerId) return;
+    placeTimerWidget(e.clientX - timerDrag.dx, e.clientY - timerDrag.dy);
+  });
+  const endDrag = (e) => {
+    if (!timerDrag || timerDrag.id !== e.pointerId) return;
+    timerDrag = null;
+    timerSettings.pos = placeTimerWidget(parseInt(els.timerWidget.style.left, 10), parseInt(els.timerWidget.style.top, 10));
+    saveTimerSettings();
+  };
+  els.timerHeader.addEventListener('pointerup', endDrag);
+  els.timerHeader.addEventListener('pointercancel', endDrag);
+  window.addEventListener('resize', () => {
+    if (timerSettings.visible) placeTimerWidget();
+  });
+
+  showTimerView('idle');
+  setTimerVisible(timerSettings.visible);
+  renderTimer();
+}
+
 // --- OBS overlays ---
 // The control page (host) pushes its state to overlay pages over WebRTC
 // (PeerJS public signaling, no own server) and BroadcastChannel (same browser).
@@ -3134,6 +3544,7 @@ loadStrings().then(async () => {
     renderSavedLists();
     loadSoundPack(state.soundPack);
     initLayoutBoxes();
+    initTimer();
   }
   renderParticipants();
   renderLogs();

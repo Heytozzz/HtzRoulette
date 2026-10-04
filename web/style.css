@@ -305,7 +305,7 @@ main {
   border: 1px solid #3a3b42;
   border-radius: 8px;
   padding: 16px 20px;
-  width: 520px;
+  width: 640px;
   max-width: 94vw;
   max-height: 88vh;
   display: flex;
@@ -763,4 +763,234 @@ body.debug-mode .layout-box.layout-dragging {
   cursor: grabbing;
   z-index: 30;
   opacity: 0.9;
+}
+
+/* --- Timer widget --- */
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#timerBtn.active {
+  border-color: var(--theme-accent, #ffcc00);
+}
+
+#timerBtn.timer-active {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--theme-accent, #ffcc00);
+}
+
+.timer-widget {
+  position: fixed;
+  z-index: 40; /* above the boxes, below the settings window (50) */
+  width: 248px;
+  background: rgba(23, 24, 28, 0.97);
+  backdrop-filter: blur(6px);
+  border: 1px solid #2f3036;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  user-select: none;
+}
+
+.timer-widget[hidden],
+.timer-widget [hidden] {
+  display: none !important;
+}
+
+.timer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid #2f3036;
+  cursor: grab;
+  touch-action: none;
+}
+
+.timer-header:active {
+  cursor: grabbing;
+}
+
+.timer-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.timer-close {
+  background: transparent;
+  border: none;
+  color: #9a9aa4;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.timer-close:hover {
+  color: #fff;
+}
+
+.timer-body {
+  padding: 12px;
+}
+
+.timer-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timer-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.timer-presets button {
+  padding: 10px 0;
+  font-weight: 600;
+}
+
+.timer-display {
+  text-align: center;
+  font-size: 44px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.timer-widget[data-status="paused"] .timer-display {
+  opacity: 0.55;
+}
+
+.timer-widget[data-status="finished"] .timer-display {
+  color: var(--theme-accent, #ffcc00);
+  animation: timer-blink 0.8s steps(2, start) infinite;
+}
+
+@keyframes timer-blink {
+  to {
+    opacity: 0.25;
+  }
+}
+
+.timer-progress {
+  height: 6px;
+  border-radius: 6px;
+  background: #2a2b31;
+  overflow: hidden;
+}
+
+.timer-progress-bar {
+  height: 100%;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--theme-accent, #ffcc00);
+}
+
+.timer-status {
+  min-height: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #b8b8c0;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.timer-controls button {
+  flex: 1;
+}
+
+.timer-controls button.secondary,
+.timer-widget button.secondary {
+  background: #3a3b42;
+}
+
+.timer-picker-cols {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.timer-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 58px;
+  outline: none;
+}
+
+.timer-col:focus-visible {
+  box-shadow: 0 0 0 2px var(--theme-accent, #ffcc00);
+  border-radius: 6px;
+}
+
+.timer-col-arrow {
+  background: transparent;
+  color: #9a9aa4;
+  border: none;
+  padding: 2px 0;
+  font-size: 11px;
+}
+
+.timer-col-arrow:hover {
+  color: #fff;
+  background: #24252b;
+}
+
+.timer-col-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.timer-col-item {
+  background: transparent;
+  color: #8a8a94;
+  border: none;
+  border-radius: 4px;
+  height: 30px;
+  padding: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.timer-col-item[data-offset="-2"],
+.timer-col-item[data-offset="2"] {
+  opacity: 0.45;
+}
+
+.timer-col-item:hover {
+  background: #24252b;
+}
+
+.timer-col-item.selected {
+  background: var(--theme-accent, #ffcc00);
+  color: #fff;
+  font-weight: 700;
+}
+
+.timer-col-label {
+  text-align: center;
+  font-size: 11px;
+  color: #9a9aa4;
+  margin-top: 2px;
+}
+
+.timer-colon {
+  font-size: 20px;
+  font-weight: 700;
+  padding-bottom: 14px;
+}
+
+.timer-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0;
 }

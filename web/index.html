@@ -4,13 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=20" />
+  <link rel="stylesheet" href="style.css?v=23" />
 </head>
 <body>
   <header>
     <div class="header-top">
       <h1 data-i18n="title">HtzRoulette Web</h1>
-      <button id="gearBtn" class="gear-btn" title="Aspecto" data-i18n-title="settingsGearTitle">⚙</button>
+      <div class="header-actions">
+        <button id="timerBtn" class="gear-btn" title="Temporizador" data-i18n-title="timerBtnTitle">⏱</button>
+        <button id="gearBtn" class="gear-btn" title="Aspecto" data-i18n-title="settingsGearTitle">⚙</button>
+      </div>
     </div>
     <div class="connection-bar">
       <label data-i18n="channelLabel">Canal de Twitch</label>
@@ -153,6 +156,61 @@
     </section>
   </main>
 
+    <div id="timerWidget" class="timer-widget" hidden>
+    <div id="timerHeader" class="timer-header">
+      <span class="timer-title" data-i18n="timerTitle">Temporizador</span>
+      <button id="timerCloseBtn" class="timer-close" type="button" title="Cerrar" data-i18n-title="timerHide">×</button>
+    </div>
+    <div class="timer-body">
+      <div id="timerIdle" class="timer-view">
+        <div class="timer-presets">
+          <button type="button" data-seconds="30">30s</button>
+          <button type="button" data-seconds="60">1m</button>
+          <button type="button" data-seconds="300">5m</button>
+          <button id="timerCustomBtn" type="button" title="Otro valor" data-i18n-title="timerCustomTitle">...</button>
+        </div>
+      </div>
+      <div id="timerPicker" class="timer-view" hidden>
+        <div class="timer-picker-cols">
+          <div class="timer-col" data-unit="h" tabindex="0">
+            <button type="button" class="timer-col-arrow" data-dir="-1">▲</button>
+            <div class="timer-col-items"></div>
+            <button type="button" class="timer-col-arrow" data-dir="1">▼</button>
+            <div class="timer-col-label" data-i18n="timerUnitH">h</div>
+          </div>
+          <span class="timer-colon">:</span>
+          <div class="timer-col" data-unit="m" tabindex="0">
+            <button type="button" class="timer-col-arrow" data-dir="-1">▲</button>
+            <div class="timer-col-items"></div>
+            <button type="button" class="timer-col-arrow" data-dir="1">▼</button>
+            <div class="timer-col-label" data-i18n="timerUnitM">min</div>
+          </div>
+          <span class="timer-colon">:</span>
+          <div class="timer-col" data-unit="s" tabindex="0">
+            <button type="button" class="timer-col-arrow" data-dir="-1">▲</button>
+            <div class="timer-col-items"></div>
+            <button type="button" class="timer-col-arrow" data-dir="1">▼</button>
+            <div class="timer-col-label" data-i18n="timerUnitS">s</div>
+          </div>
+        </div>
+        <div class="timer-controls">
+          <button id="timerPickerStart" type="button" data-i18n="timerStart">Iniciar</button>
+          <button id="timerPickerCancel" type="button" class="secondary" data-i18n="timerPickerCancel">Cancelar</button>
+        </div>
+      </div>
+      <div id="timerRun" class="timer-view" hidden>
+        <div id="timerDisplay" class="timer-display">00:00</div>
+        <div class="timer-progress"><div id="timerProgressBar" class="timer-progress-bar"></div></div>
+        <div id="timerStatus" class="timer-status"></div>
+        <div class="timer-controls">
+          <button id="timerPauseBtn" type="button">Pausar</button>
+          <button id="timerRepeatBtn" type="button" data-i18n="timerRepeat" hidden>Repetir</button>
+          <button id="timerCancelBtn" type="button" class="secondary">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="appearanceModal" class="modal-overlay hidden">
     <div class="modal-box">
       <div class="modal-header">
@@ -164,6 +222,7 @@
         <button class="tab-btn active" data-tab="appearance" role="tab" data-i18n="appearanceTitle">Aspecto</button>
         <button class="tab-btn" data-tab="text" role="tab" data-i18n="tabText">Texto</button>
         <button class="tab-btn" data-tab="sound" role="tab" data-i18n="tabSound">Sonido</button>
+        <button class="tab-btn" data-tab="timer" role="tab" data-i18n="tabTimer">Temporizador</button>
         <button class="tab-btn" data-tab="themes" role="tab" data-i18n="themesSubcategory">Temas</button>
         <button class="tab-btn" data-tab="commands" role="tab" data-i18n="tabCommands">Comandos</button>
         <button class="tab-btn" data-tab="overlays" role="tab" data-i18n="tabOverlays">Overlays</button>
@@ -270,6 +329,27 @@
           <button id="soundPreviewFinal" class="small-btn" data-i18n="soundPreviewFinal">Ganador final</button>
         </div>
       </div>
+      <div class="settings-tab hidden" data-tab="timer" role="tabpanel">
+        <label class="inline-label">
+          <input id="timerShowCheckbox" type="checkbox" />
+          <span data-i18n="timerShowLabel">Mostrar el temporizador</span>
+        </label>
+        <label class="inline-label">
+          <input id="timerAlarmCheckbox" type="checkbox" checked />
+          <span data-i18n="timerAlarmLabel">Sonar la alarma al terminar</span>
+        </label>
+        <div class="badge-actions">
+          <button id="timerAlarmTestBtn" class="small-btn" data-i18n="timerAlarmTest">Probar alarma</button>
+        </div>
+        <label data-i18n="timerActionsTitle">Al terminar el tiempo</label>
+        <div class="timer-actions-list">
+          <label class="inline-label"><input id="timerActShuffle" type="checkbox" /><span data-i18n="timerActShuffle">Barajar la lista</span></label>
+          <label class="inline-label"><input id="timerActCloseJoin" type="checkbox" /><span data-i18n="timerActCloseJoin">Detener ingresos</span></label>
+          <label class="inline-label"><input id="timerActOpenJoin" type="checkbox" /><span data-i18n="timerActOpenJoin">Aceptar ingresos</span></label>
+          <label class="inline-label"><input id="timerActSpin" type="checkbox" /><span data-i18n="timerActSpin">Girar la ruleta</span></label>
+        </div>
+        <p class="modal-note" data-i18n="timerActionsNote">Nota</p>
+      </div>
       <div class="settings-tab hidden" data-tab="themes" role="tabpanel">
       <h3 data-i18n="themesSubcategory">Temas</h3>
       <label data-i18n="themeLabel">Carpeta de tema</label>
@@ -342,6 +422,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>
