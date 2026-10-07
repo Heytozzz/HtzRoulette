@@ -224,5 +224,9 @@
   "timerActCloseJoin": "Detener ingresos",
   "timerActOpenJoin": "Aceptar ingresos",
   "timerActSpin": "Girar la ruleta",
-  "timerActionsNote": "Por defecto solo suena la alarma. Las acciones marcadas se ejecutan en este orden: barajar, ingresos y, por último, girar la ruleta. \"Detener ingresos\" y \"Aceptar ingresos\" no se pueden activar a la vez."
+  "timerActionsNote": "Por defecto solo suena la alarma. Las acciones marcadas se ejecutan en este orden: barajar, ingresos y, por último, girar la ruleta. \"Detener ingresos\" y \"Aceptar ingresos\" no se pueden activar a la vez.",
+  "spinStyleLabel": "Modo de giro",
+  "spinStyleWheel": "Normal",
+  "spinStyleArrows": "Girar las flechas",
+  "livesRemaining": "{n} vidas restantes"
 }

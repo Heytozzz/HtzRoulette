@@ -109,6 +109,7 @@ const els = {
   subsOnlyCheckbox: document.getElementById('subsOnlyCheckbox'),
 
   spinDurationInput: document.getElementById('spinDurationInput'),
+  spinStyleSelect: document.getElementById('spinStyleSelect'),
   modeSelect: document.getElementById('modeSelect'),
   eliminationOptions: document.getElementById('eliminationOptions'),
   eliminationSubMode: document.getElementById('eliminationSubMode'),
@@ -318,7 +319,9 @@ els.manualSubCheckbox.addEventListener('change', () => {
   el.addEventListener('input', () => drawWheel());
 });
 
-const WHEEL_BASE_SIZE = 520;
+// The canvas has a margin around the wheel for the selection arrows (30px at 100%): 560 / 2 - 30 = 250 = wheel radius
+const WHEEL_BASE_SIZE = 560;
+const WHEEL_RADIUS_RATIO = 250 / 280;
 
 function applyWheelScale(scaleValue) {
   const size = Math.round(WHEEL_BASE_SIZE * (scaleValue / 100));
@@ -691,7 +694,7 @@ function drawWheel() {
   const { width, height } = els.wheelCanvas;
   const cx = width / 2;
   const cy = height / 2;
-  const radius = Math.min(cx, cy) - 10;
+  const radius = Math.min(cx, cy) * WHEEL_RADIUS_RATIO;
 
   ctx.clearRect(0, 0, width, height);
   const count = state.participants.length;
@@ -1039,7 +1042,7 @@ function drawColorSlices(cx, cy, radius, count, names) {
   const sliceAngle = (Math.PI * 2) / count;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(state.rotation);
+  ctx.rotate(wheelDrawRotation());
 
   for (let i = 0; i < count; i += 1) {
     const start = i * sliceAngle;
@@ -1074,7 +1077,7 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
   const sliceAngle = (Math.PI * 2) / count;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(state.rotation);
+  ctx.rotate(wheelDrawRotation());
 
   for (let i = 0; i < count; i += 1) {
     const start = i * sliceAngle;
@@ -1128,7 +1131,7 @@ function drawFullWheelImage(cx, cy, radius, count) {
   const img = getLoadedImage(state.fullWheelImageUrl);
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(state.rotation);
+  ctx.rotate(wheelDrawRotation());
 
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -1161,24 +1164,45 @@ function drawFullWheelImage(cx, cy, radius, count) {
   ctx.restore();
 }
 
+const POINTER_REF_RADIUS = 250; // arrow dimensions below are for a wheel of this radius and scale with it
+
 function drawPointers(cx, cy, radius) {
   const pointerCount = pointerCountForCurrentSettings();
-  const pointerAngles = getPointerAngles(pointerCount);
-  pointerAngles.forEach((angle) => {
+  const k = radius / POINTER_REF_RADIUS;
+  // "Girar las flechas" mode: the wheel stays still and the arrows travel around it
+  const orbit = spinStyle() === 'arrows' ? state.rotation : 0;
+  getPointerAngles(pointerCount).forEach((angle) => {
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(angle);
+    ctx.rotate(angle + orbit);
     ctx.beginPath();
-    ctx.moveTo(radius - 2, 0);
-    ctx.lineTo(radius + 16, -10);
-    ctx.lineTo(radius + 16, 10);
+    ctx.moveTo(radius - 2 * k, 0);
+    ctx.lineTo(radius + 24 * k, -14 * k);
+    ctx.lineTo(radius + 24 * k, 14 * k);
     ctx.closePath();
     ctx.fillStyle = '#ffcc00';
     ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1, 1.5 * k);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.stroke();
     ctx.restore();
   });
 }
 
+// Spin style: 'wheel' (normal: the wheel turns) or 'arrows' (the wheel stays still
+// and the arrows turn). state.rotation is the single animated value for both; in
+// arrows mode the arrows sit at angle + rotation, so relative to the wheel the
+// rotation runs the other way. `effectiveRotation` is that wheel-relative rotation.
+function spinStyle() {
+  return els.spinStyleSelect.value;
+}
+function effectiveRotation(rotation) {
+  return spinStyle() === 'arrows' ? -rotation : rotation;
+}
+function wheelDrawRotation() {
+  return spinStyle() === 'arrows' ? 0 : state.rotation;
+}
 function getPointerAngles(n) {
   const angles = [];
   for (let p = 0; p < n; p += 1) {
@@ -1199,7 +1223,7 @@ function getSelectionForRotation(rotation, pointerCount) {
   const pointerAngles = getPointerAngles(pointerCount);
 
   const rawIndices = pointerAngles.map((angle) => {
-    const wheelSpaceAngle = normalizeAngle(angle - rotation);
+    const wheelSpaceAngle = normalizeAngle(angle - effectiveRotation(rotation));
     return Math.floor(wheelSpaceAngle / sliceAngle) % count;
   });
 
@@ -1231,6 +1255,7 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
 
   scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngle, endKind });
   state.animating = true;
+  els.spinStyleSelect.disabled = true; // changing the style mid-spin would change where it lands
 
   function step() {
     if (finished) return;
@@ -1243,6 +1268,7 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
     if (progress >= 1) {
       finished = true;
       state.animating = false;
+      els.spinStyleSelect.disabled = false;
       bgTimers.clear(watchdog);
       onDone();
     }
@@ -1290,7 +1316,8 @@ function spin() {
   const extraSpins = 8 + Math.floor(Math.random() * 4);
 
   const startRotation = state.rotation;
-  const desiredMod = normalizeAngle(-targetSliceCenter);
+  // wheel mode: the wheel must end turned by -center; arrows mode: the arrow must end at +center
+  const desiredMod = normalizeAngle(spinStyle() === 'arrows' ? targetSliceCenter : -targetSliceCenter);
   const currentMod = normalizeAngle(startRotation);
   const alignmentDelta = normalizeAngle(desiredMod - currentMod);
   const targetRotation = startRotation + alignmentDelta + extraSpins * Math.PI * 2;
@@ -1336,7 +1363,12 @@ function onSpinComplete(selection, settings) {
     renderParticipants();
     renderLogs();
     drawWheel();
-    els.modeStatus.textContent = t('roundEliminated', { names: uniqueRoundNames.join(', ') });
+    // Lives = copies of the participant still on the wheel. Only shown when more than one is left.
+    const withLives = (name) => {
+      const lives = state.participants.filter((n) => n === name).length;
+      return lives > 1 ? `${name} (${t('livesRemaining', { n: lives })})` : name;
+    };
+    els.modeStatus.textContent = t('roundEliminated', { names: uniqueRoundNames.map(withLives).join(', ') });
 
     const remainingUniqueNames = [...new Set(state.participants)];
     if (remainingUniqueNames.length <= settings.eliminationFinalWinnersCount) {
@@ -2432,6 +2464,24 @@ function scheduleSound(ctx, kind, when, gainScale = 1) {
   else scheduleLanding(ctx, when);
 }
 
+// Times (ms from the start of the spin) at which a slice boundary crosses an arrow
+function computeTickTimesMs({ startRotation, targetRotation, duration, sliceAngle }) {
+  const times = [];
+  const MIN_TICK_GAP_MS = 20;
+  let lastIndex = null;
+  let lastTickMs = -Infinity;
+  for (let ms = 0; ms <= duration; ms += 2) {
+    const rot = startRotation + (targetRotation - startRotation) * spinEasing(ms / duration);
+    const idx = Math.floor(normalizeAngle(-effectiveRotation(rot)) / sliceAngle);
+    if (lastIndex !== null && idx !== lastIndex && ms - lastTickMs >= MIN_TICK_GAP_MS) {
+      times.push(ms);
+      lastTickMs = ms;
+    }
+    lastIndex = idx;
+  }
+  return times;
+}
+
 // The spin is fully deterministic (same easing/duration as the animation), so
 // every tick and the end sound are computed up front and scheduled on the
 // audio clock. The audio thread plays them on time regardless of whether the
@@ -2447,19 +2497,7 @@ function scheduleSpinSounds({ startRotation, targetRotation, duration, sliceAngl
   loadSoundPack(state.soundPack); // no-op when already loaded
   const startPerf = performance.now();
 
-  const tickTimesMs = [];
-  const MIN_TICK_GAP_MS = 20;
-  let lastIndex = null;
-  let lastTickMs = -Infinity;
-  for (let ms = 0; ms <= duration; ms += 2) {
-    const rot = startRotation + (targetRotation - startRotation) * spinEasing(ms / duration);
-    const idx = Math.floor(normalizeAngle(-rot) / sliceAngle);
-    if (lastIndex !== null && idx !== lastIndex && ms - lastTickMs >= MIN_TICK_GAP_MS) {
-      tickTimesMs.push(ms);
-      lastTickMs = ms;
-    }
-    lastIndex = idx;
-  }
+  const tickTimesMs = computeTickTimesMs({ startRotation, targetRotation, duration, sliceAngle });
 
   const schedule = () => {
     try {
@@ -2517,6 +2555,7 @@ function saveState() {
       eliminatedLog: state.eliminatedLog,
       winnersLog: state.winnersLog,
       spinDuration: els.spinDurationInput.value,
+      spinStyle: els.spinStyleSelect.value,
       mode: els.modeSelect.value,
       eliminationSubMode: els.eliminationSubMode.value,
       eliminationArrowCount: els.eliminationArrowCount.value,
@@ -2570,6 +2609,7 @@ async function applySavedState() {
   state.winnersLog = Array.isArray(data.winnersLog) ? data.winnersLog : [];
 
   if (data.spinDuration != null) els.spinDurationInput.value = data.spinDuration;
+  if (data.spinStyle === 'wheel' || data.spinStyle === 'arrows') els.spinStyleSelect.value = data.spinStyle;
   if (data.mode != null) els.modeSelect.value = data.mode;
   if (data.eliminationSubMode != null) els.eliminationSubMode.value = data.eliminationSubMode;
   if (data.eliminationArrowCount != null) els.eliminationArrowCount.value = data.eliminationArrowCount;
@@ -2836,6 +2876,10 @@ els.debugModeCheckbox.addEventListener('change', () => {
   setDebugMode(els.debugModeCheckbox.checked);
 });
 els.resetLayoutBtn.addEventListener('click', resetLayout);
+els.spinStyleSelect.addEventListener('change', () => {
+  drawWheel();
+  saveState();
+});
 
 // --- Timer widget ---
 // A floating countdown (30s / 1m / 5m / custom). When it ends it sounds an alarm and
@@ -3229,7 +3273,7 @@ function initTimer() {
 // (PeerJS public signaling, no own server) and BroadcastChannel (same browser).
 // Overlays run the same wheel code and replay each spin locally.
 const OVERLAY_SETTING_KEYS = [
-  'modeSelect', 'eliminationSubMode', 'eliminationArrowCount',
+  'modeSelect', 'spinStyleSelect', 'eliminationSubMode', 'eliminationArrowCount',
   'eliminationFinalWinnersCount', 'winnersSubMode', 'winnersCountInput',
 ];
 const overlaySid = Math.random().toString(36).slice(2);

@@ -370,7 +370,7 @@ main {
   position: relative;
   background: rgba(0, 0, 0, 0.45);
   border-radius: 16px;
-  padding: 24px;
+  padding: 4px; /* the canvas already carries a 30px margin for the arrows */
   display: inline-flex;
   cursor: pointer;
 }

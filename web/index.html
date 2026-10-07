@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=23" />
+  <link rel="stylesheet" href="style.css?v=24" />
 </head>
 <body>
   <header>
@@ -84,7 +84,7 @@
           <ul id="eliminatedLogList"></ul>
         </div>
         <div id="wheelBox" class="wheel-box">
-          <canvas id="wheelCanvas" width="520" height="520"></canvas>
+          <canvas id="wheelCanvas" width="560" height="560"></canvas>
         </div>
       </div>
       <div id="messagesBox" class="messages-box">
@@ -98,6 +98,12 @@
 
       <label data-i18n="spinDurationLabel">Duración del giro (segundos)</label>
       <input id="spinDurationInput" type="number" min="1" max="15" step="0.5" value="4" />
+
+      <label data-i18n="spinStyleLabel">Modo de giro</label>
+      <select id="spinStyleSelect">
+        <option value="wheel" data-i18n="spinStyleWheel">Normal</option>
+        <option value="arrows" data-i18n="spinStyleArrows">Girar las flechas</option>
+      </select>
 
       <label data-i18n="modeLabel">Modo</label>
       <select id="modeSelect">
@@ -422,6 +428,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>
