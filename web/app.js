@@ -157,6 +157,23 @@ const els = {
   saveThemeBtn: document.getElementById('saveThemeBtn'),
   debugModeCheckbox: document.getElementById('debugModeCheckbox'),
   resetLayoutBtn: document.getElementById('resetLayoutBtn'),
+  imagesBtn: document.getElementById('imagesBtn'),
+  imagesWidget: document.getElementById('imagesWidget'),
+  imagesHeader: document.getElementById('imagesHeader'),
+  imagesCloseBtn: document.getElementById('imagesCloseBtn'),
+  imageWinSelect: document.getElementById('imageWinSelect'),
+  imageWinImg: document.getElementById('imageWinImg'),
+  imageWinEmpty: document.getElementById('imageWinEmpty'),
+  imageWinMessage: document.getElementById('imageWinMessage'),
+  imageWinCreateBtn: document.getElementById('imageWinCreateBtn'),
+  imagesShowCheckbox: document.getElementById('imagesShowCheckbox'),
+  newImageTitle: document.getElementById('newImageTitle'),
+  newImageFile: document.getElementById('newImageFile'),
+  saveImagePresetBtn: document.getElementById('saveImagePresetBtn'),
+  imagePresetStatus: document.getElementById('imagePresetStatus'),
+  imageManageSelect: document.getElementById('imageManageSelect'),
+  imageManagePreview: document.getElementById('imageManagePreview'),
+  deleteImagePresetBtn: document.getElementById('deleteImagePresetBtn'),
   timerBtn: document.getElementById('timerBtn'),
   timerWidget: document.getElementById('timerWidget'),
   timerHeader: document.getElementById('timerHeader'),
@@ -1363,10 +1380,12 @@ function onSpinComplete(selection, settings) {
     renderParticipants();
     renderLogs();
     drawWheel();
-    // Lives = copies of the participant still on the wheel. Only shown when more than one is left.
+    // Lives = copies of the participant still on the wheel. Shown while at least one is left
+    // (nothing is shown when the participant is out for good).
     const withLives = (name) => {
       const lives = state.participants.filter((n) => n === name).length;
-      return lives > 1 ? `${name} (${t('livesRemaining', { n: lives })})` : name;
+      if (lives < 1) return name;
+      return `${name} (${lives === 1 ? t('livesRemainingOne') : t('livesRemaining', { n: lives })})`;
     };
     els.modeStatus.textContent = t('roundEliminated', { names: uniqueRoundNames.map(withLives).join(', ') });
 
@@ -2881,6 +2900,60 @@ els.spinStyleSelect.addEventListener('change', () => {
   saveState();
 });
 
+// --- Floating windows (timer, images) ---
+// Draggable by the title bar, snapped to the same grid as the boxes and kept inside the
+// viewport. Clicking a window brings it to the front (always below the settings window).
+const floatingWindows = [];
+
+function bringFloatingToFront(el) {
+  floatingWindows.forEach((w) => {
+    w.el.style.zIndex = w.el === el ? '41' : '40';
+  });
+}
+
+function initFloatingWindow({ el, header, settings, fallback, save }) {
+  const win = { el };
+  floatingWindows.push(win);
+
+  win.place = (x, y) => {
+    const rect = el.getBoundingClientRect();
+    const maxX = Math.max(0, window.innerWidth - rect.width);
+    const maxY = Math.max(0, window.innerHeight - rect.height);
+    const pos = settings.pos || fallback(rect);
+    const nx = Math.min(maxX, Math.max(0, snapToGrid(x === undefined ? pos.x : x)));
+    const ny = Math.min(maxY, Math.max(0, snapToGrid(y === undefined ? pos.y : y)));
+    el.style.left = `${nx}px`;
+    el.style.top = `${ny}px`;
+    return { x: nx, y: ny };
+  };
+
+  let drag = null;
+  el.addEventListener('pointerdown', () => bringFloatingToFront(el));
+  header.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    const rect = el.getBoundingClientRect();
+    drag = { id: e.pointerId, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    header.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  header.addEventListener('pointermove', (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    win.place(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  const endDrag = (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    drag = null;
+    settings.pos = win.place(parseInt(el.style.left, 10), parseInt(el.style.top, 10));
+    save();
+  };
+  header.addEventListener('pointerup', endDrag);
+  header.addEventListener('pointercancel', endDrag);
+  window.addEventListener('resize', () => {
+    if (!el.hidden) win.place();
+  });
+  return win;
+}
+
 // --- Timer widget ---
 // A floating countdown (30s / 1m / 5m / custom). When it ends it sounds an alarm and
 // can optionally run actions (shuffle, close/open joins, spin). By default it only
@@ -2906,7 +2979,7 @@ const TIMER_ACTION_IDS = {
 const TIMER_PICKER_MAX = { h: 23, m: 59, s: 59 };
 const timerPickerValue = { h: 0, m: 0, s: 0 };
 const timerBaseTitle = document.title;
-let timerDrag = null;
+let timerWin = null;
 
 function saveTimerSettings() {
   try {
@@ -3156,26 +3229,13 @@ function startFromTimerPicker() {
   startTimer(h * 3600 + m * 60 + s);
 }
 
-// ---- floating window: position (on the grid), drag, visibility ----
-function placeTimerWidget(x, y) {
-  const rect = els.timerWidget.getBoundingClientRect();
-  const maxX = Math.max(0, window.innerWidth - rect.width);
-  const maxY = Math.max(0, window.innerHeight - rect.height);
-  const fallback = { x: window.innerWidth - rect.width - 40, y: 140 };
-  const pos = timerSettings.pos || fallback;
-  const nx = Math.min(maxX, Math.max(0, snapToGrid(x === undefined ? pos.x : x)));
-  const ny = Math.min(maxY, Math.max(0, snapToGrid(y === undefined ? pos.y : y)));
-  els.timerWidget.style.left = `${nx}px`;
-  els.timerWidget.style.top = `${ny}px`;
-  return { x: nx, y: ny };
-}
-
+// ---- visibility ----
 function setTimerVisible(visible) {
   timerSettings.visible = visible;
   els.timerWidget.hidden = !visible;
   els.timerShowCheckbox.checked = visible;
   els.timerBtn.classList.toggle('active', visible);
-  if (visible) placeTimerWidget();
+  if (visible) timerWin.place();
   saveTimerSettings();
 }
 
@@ -3239,33 +3299,261 @@ function initTimer() {
     if (e.key === 'Escape') showTimerView('idle');
   });
 
-  // Drag by the title bar; positions snap to the same grid as the other boxes
-  els.timerHeader.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || e.target.closest('button')) return;
-    const rect = els.timerWidget.getBoundingClientRect();
-    timerDrag = { id: e.pointerId, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
-    els.timerHeader.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  els.timerHeader.addEventListener('pointermove', (e) => {
-    if (!timerDrag || timerDrag.id !== e.pointerId) return;
-    placeTimerWidget(e.clientX - timerDrag.dx, e.clientY - timerDrag.dy);
-  });
-  const endDrag = (e) => {
-    if (!timerDrag || timerDrag.id !== e.pointerId) return;
-    timerDrag = null;
-    timerSettings.pos = placeTimerWidget(parseInt(els.timerWidget.style.left, 10), parseInt(els.timerWidget.style.top, 10));
-    saveTimerSettings();
-  };
-  els.timerHeader.addEventListener('pointerup', endDrag);
-  els.timerHeader.addEventListener('pointercancel', endDrag);
-  window.addEventListener('resize', () => {
-    if (timerSettings.visible) placeTimerWidget();
+  timerWin = initFloatingWindow({
+    el: els.timerWidget,
+    header: els.timerHeader,
+    settings: timerSettings,
+    fallback: (rect) => ({ x: window.innerWidth - rect.width - 40, y: 140 }),
+    save: saveTimerSettings,
   });
 
   showTimerView('idle');
   setTimerVisible(timerSettings.visible);
   renderTimer();
+}
+
+// --- Image presets window ---
+// Presets (title + image) are created like image themes: a title, a file and "Save".
+// They live in IndexedDB (key = title, so saving an existing title replaces it). A
+// floating window shows the one picked in its drop-down list.
+const IMAGE_SETTINGS_KEY = 'htz_images';
+const IMAGE_PRESETS_DB = 'htzroulette-image-presets';
+const IMAGE_PRESETS_STORE = 'presets';
+const IMAGE_WIN_MIN = { w: 220, h: 180 };
+const imageSettings = { visible: false, pos: null, size: null, selected: '' };
+let imageWin = null;
+let imageWinUrl = null;
+let imageManageUrl = null;
+let imageShowToken = 0;
+let imagePresetTitles = [];
+
+function openImagePresetsDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IMAGE_PRESETS_DB, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IMAGE_PRESETS_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbRequest(mode, fn) {
+  const db = await openImagePresetsDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_PRESETS_STORE, mode);
+    const req = fn(tx.objectStore(IMAGE_PRESETS_STORE));
+    tx.oncomplete = () => {
+      db.close();
+      resolve(req ? req.result : undefined);
+    };
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+const saveImagePreset = (title, image) => idbRequest('readwrite', (store) => store.put({ image, savedAt: Date.now() }, title));
+const loadImagePreset = (title) => idbRequest('readonly', (store) => store.get(title));
+const deleteImagePreset = (title) => idbRequest('readwrite', (store) => store.delete(title));
+const listImagePresetTitles = () => idbRequest('readonly', (store) => store.getAllKeys());
+
+function saveImageSettings() {
+  try {
+    localStorage.setItem(IMAGE_SETTINGS_KEY, JSON.stringify(imageSettings));
+  } catch (err) {
+    // Storage may be unavailable; settings just won't persist
+  }
+}
+
+function loadImageSettings() {
+  try {
+    const data = JSON.parse(localStorage.getItem(IMAGE_SETTINGS_KEY));
+    if (!data || typeof data !== 'object') return;
+    imageSettings.visible = !!data.visible;
+    imageSettings.selected = typeof data.selected === 'string' ? data.selected : '';
+    if (data.pos && Number.isFinite(data.pos.x) && Number.isFinite(data.pos.y)) {
+      imageSettings.pos = { x: data.pos.x, y: data.pos.y };
+    }
+    if (data.size && Number.isFinite(data.size.w) && Number.isFinite(data.size.h)) {
+      imageSettings.size = { w: Math.round(data.size.w), h: Math.round(data.size.h) };
+    }
+  } catch (err) {
+    // Unreadable data: keep the defaults
+  }
+}
+
+function setImageStatus(key, params) {
+  els.imagePresetStatus.textContent = key ? t(key, params) : '';
+}
+
+function setImagesVisible(visible) {
+  imageSettings.visible = visible;
+  els.imagesWidget.hidden = !visible;
+  els.imagesShowCheckbox.checked = visible;
+  els.imagesBtn.classList.toggle('active', visible);
+  if (visible) imageWin.place();
+  saveImageSettings();
+}
+
+// Fills both lists (the window's drop-down and the one used to manage presets)
+function renderImagePresetLists() {
+  const fill = (select, placeholderKey) => {
+    select.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = t(placeholderKey);
+    select.appendChild(none);
+    imagePresetTitles.forEach((title) => {
+      const option = document.createElement('option');
+      option.value = title;
+      option.textContent = title; // text, never HTML: titles are free text
+      select.appendChild(option);
+    });
+  };
+  const managed = els.imageManageSelect.value;
+  fill(els.imageWinSelect, 'imageWinNone');
+  fill(els.imageManageSelect, 'imageManageNone');
+  els.imageWinSelect.value = imageSettings.selected;
+  els.imageManageSelect.value = imagePresetTitles.includes(managed) ? managed : '';
+  els.imageWinSelect.disabled = imagePresetTitles.length === 0;
+  updateImageManage();
+}
+
+// Shows the picked preset in the window (or the matching empty message)
+async function showImagePreset(title) {
+  const token = ++imageShowToken;
+  let url = null;
+  if (title) {
+    const data = await loadImagePreset(title).catch(() => null);
+    if (token !== imageShowToken) return; // a newer pick replaced this one
+    if (data && data.image) url = URL.createObjectURL(data.image);
+  }
+  if (imageWinUrl) URL.revokeObjectURL(imageWinUrl);
+  imageWinUrl = url;
+  if (url) els.imageWinImg.src = url;
+  else els.imageWinImg.removeAttribute('src');
+  els.imageWinImg.hidden = !url;
+  els.imageWinEmpty.hidden = !!url;
+  const hasPresets = imagePresetTitles.length > 0;
+  els.imageWinMessage.textContent = t(hasPresets ? 'imageWinPick' : 'imageWinEmpty');
+  els.imageWinCreateBtn.hidden = hasPresets;
+}
+
+// Preview + delete button for the preset picked in the settings list
+async function updateImageManage() {
+  const title = els.imageManageSelect.value;
+  els.deleteImagePresetBtn.hidden = !title;
+  if (imageManageUrl) {
+    URL.revokeObjectURL(imageManageUrl);
+    imageManageUrl = null;
+  }
+  els.imageManagePreview.hidden = true;
+  els.imageManagePreview.removeAttribute('src');
+  if (!title) return;
+  const data = await loadImagePreset(title).catch(() => null);
+  if (els.imageManageSelect.value !== title || !data || !data.image) return;
+  imageManageUrl = URL.createObjectURL(data.image);
+  els.imageManagePreview.src = imageManageUrl;
+  els.imageManagePreview.hidden = false;
+}
+
+async function refreshImagePresets() {
+  try {
+    const titles = await listImagePresetTitles();
+    imagePresetTitles = titles.slice().sort((a, b) => String(a).localeCompare(String(b)));
+  } catch (err) {
+    imagePresetTitles = [];
+  }
+  if (!imagePresetTitles.includes(imageSettings.selected)) imageSettings.selected = '';
+  renderImagePresetLists();
+  await showImagePreset(imageSettings.selected);
+  saveImageSettings();
+}
+
+async function saveImagePresetFromForm() {
+  const title = els.newImageTitle.value.trim();
+  const file = els.newImageFile.files && els.newImageFile.files[0];
+  if (!title) { setImageStatus('imageStatusNoTitle'); return; }
+  if (!file) { setImageStatus('imageStatusNoFile'); return; }
+  if (!file.type.startsWith('image/')) { setImageStatus('imageStatusNotImage'); return; }
+  const replaced = imagePresetTitles.includes(title);
+  try {
+    await saveImagePreset(title, file);
+  } catch (err) {
+    console.error('Could not save the image preset:', err);
+    setImageStatus('imageStatusError');
+    return;
+  }
+  els.newImageTitle.value = '';
+  els.newImageFile.value = '';
+  imageSettings.selected = title; // shown right away, like a newly saved theme
+  await refreshImagePresets();
+  setImageStatus(replaced ? 'imageStatusUpdated' : 'imageStatusSaved', { title });
+}
+
+async function deleteSelectedImagePreset() {
+  const title = els.imageManageSelect.value;
+  if (!title) return;
+  await deleteImagePreset(title);
+  if (imageSettings.selected === title) imageSettings.selected = '';
+  await refreshImagePresets();
+  setImageStatus('imageStatusDeleted', { title });
+}
+
+function applyImageWindowSize() {
+  const size = imageSettings.size;
+  if (!size) return;
+  const w = Math.min(Math.max(size.w, IMAGE_WIN_MIN.w), window.innerWidth);
+  const h = Math.min(Math.max(size.h, IMAGE_WIN_MIN.h), window.innerHeight);
+  els.imagesWidget.style.width = `${w}px`;
+  els.imagesWidget.style.height = `${h}px`;
+}
+
+async function initImages() {
+  loadImageSettings();
+  applyImageWindowSize();
+
+  imageWin = initFloatingWindow({
+    el: els.imagesWidget,
+    header: els.imagesHeader,
+    settings: imageSettings,
+    fallback: (rect) => ({ x: 40, y: Math.max(0, window.innerHeight - rect.height - 40) }),
+    save: saveImageSettings,
+  });
+
+  els.imagesBtn.addEventListener('click', () => setImagesVisible(!imageSettings.visible));
+  els.imagesCloseBtn.addEventListener('click', () => setImagesVisible(false));
+  els.imagesShowCheckbox.addEventListener('change', () => setImagesVisible(els.imagesShowCheckbox.checked));
+  els.imageWinSelect.addEventListener('change', () => {
+    imageSettings.selected = els.imageWinSelect.value;
+    saveImageSettings();
+    showImagePreset(imageSettings.selected);
+  });
+  els.imageWinCreateBtn.addEventListener('click', () => {
+    els.gearBtn.click();
+    showSettingsTab('images');
+  });
+  els.saveImagePresetBtn.addEventListener('click', saveImagePresetFromForm);
+  els.deleteImagePresetBtn.addEventListener('click', deleteSelectedImagePreset);
+  els.imageManageSelect.addEventListener('change', updateImageManage);
+  els.newImageTitle.addEventListener('input', () => setImageStatus(''));
+  els.newImageFile.addEventListener('change', () => setImageStatus(''));
+
+  // The native resize handle changes the window size: remember it
+  if (typeof ResizeObserver !== 'undefined') {
+    let seenFirst = false; // the first notification is just the initial layout
+    new ResizeObserver(() => {
+      if (els.imagesWidget.hidden) return;
+      if (!seenFirst) { seenFirst = true; return; }
+      const rect = els.imagesWidget.getBoundingClientRect();
+      imageSettings.size = { w: Math.round(rect.width), h: Math.round(rect.height) };
+      imageWin.place();
+      saveImageSettings();
+    }).observe(els.imagesWidget);
+  }
+
+  setImagesVisible(imageSettings.visible);
+  await refreshImagePresets();
 }
 
 // --- OBS overlays ---
@@ -3589,6 +3877,7 @@ loadStrings().then(async () => {
     loadSoundPack(state.soundPack);
     initLayoutBoxes();
     initTimer();
+    initImages();
   }
   renderParticipants();
   renderLogs();

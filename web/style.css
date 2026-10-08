@@ -305,7 +305,7 @@ main {
   border: 1px solid #3a3b42;
   border-radius: 8px;
   padding: 16px 20px;
-  width: 640px;
+  width: 720px;
   max-width: 94vw;
   max-height: 88vh;
   display: flex;
@@ -781,10 +781,9 @@ body.debug-mode .layout-box.layout-dragging {
   color: var(--theme-accent, #ffcc00);
 }
 
-.timer-widget {
+.float-window {
   position: fixed;
   z-index: 40; /* above the boxes, below the settings window (50) */
-  width: 248px;
   background: rgba(23, 24, 28, 0.97);
   backdrop-filter: blur(6px);
   border: 1px solid #2f3036;
@@ -793,12 +792,16 @@ body.debug-mode .layout-box.layout-dragging {
   user-select: none;
 }
 
-.timer-widget[hidden],
-.timer-widget [hidden] {
+.timer-widget {
+  width: 248px;
+}
+
+.float-window[hidden],
+.float-window [hidden] {
   display: none !important;
 }
 
-.timer-header {
+.float-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -808,16 +811,16 @@ body.debug-mode .layout-box.layout-dragging {
   touch-action: none;
 }
 
-.timer-header:active {
+.float-header:active {
   cursor: grabbing;
 }
 
-.timer-title {
+.float-title {
   font-size: 13px;
   font-weight: 600;
 }
 
-.timer-close {
+.float-close {
   background: transparent;
   border: none;
   color: #9a9aa4;
@@ -827,7 +830,7 @@ body.debug-mode .layout-box.layout-dragging {
   cursor: pointer;
 }
 
-.timer-close:hover {
+.float-close:hover {
   color: #fff;
 }
 
@@ -993,4 +996,85 @@ body.debug-mode .layout-box.layout-dragging {
   flex-direction: column;
   gap: 2px;
   margin: 4px 0;
+}
+
+/* Anything with the hidden attribute stays hidden, whatever display it was given */
+[hidden] {
+  display: none !important;
+}
+
+/* --- Images window --- */
+.images-widget {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  height: 300px;
+  min-width: 220px;
+  min-height: 180px;
+  max-width: 98vw;
+  max-height: 98vh;
+  overflow: hidden;
+  resize: both;
+}
+
+.images-widget .float-header {
+  flex-shrink: 0;
+}
+
+.images-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+}
+
+.images-body select {
+  width: 100%;
+}
+
+.images-view {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  background: #0d0d0e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.images-view img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.images-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: #9a9aa4;
+}
+
+.image-manage-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 140px;
+  margin: 6px 0;
+  border-radius: 4px;
+  background: #0d0d0e;
+  object-fit: contain;
+}
+
+#imagesBtn.active {
+  border-color: var(--theme-accent, #ffcc00);
 }

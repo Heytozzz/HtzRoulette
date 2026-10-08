@@ -4,13 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=24" />
+  <link rel="stylesheet" href="style.css?v=25" />
 </head>
 <body>
   <header>
     <div class="header-top">
       <h1 data-i18n="title">HtzRoulette Web</h1>
       <div class="header-actions">
+        <button id="imagesBtn" class="gear-btn" title="Imágenes" data-i18n-title="imagesBtnTitle">🖼</button>
         <button id="timerBtn" class="gear-btn" title="Temporizador" data-i18n-title="timerBtnTitle">⏱</button>
         <button id="gearBtn" class="gear-btn" title="Aspecto" data-i18n-title="settingsGearTitle">⚙</button>
       </div>
@@ -162,10 +163,10 @@
     </section>
   </main>
 
-    <div id="timerWidget" class="timer-widget" hidden>
-    <div id="timerHeader" class="timer-header">
-      <span class="timer-title" data-i18n="timerTitle">Temporizador</span>
-      <button id="timerCloseBtn" class="timer-close" type="button" title="Cerrar" data-i18n-title="timerHide">×</button>
+    <div id="timerWidget" class="timer-widget float-window" hidden>
+    <div id="timerHeader" class="float-header">
+      <span class="float-title" data-i18n="timerTitle">Temporizador</span>
+      <button id="timerCloseBtn" class="float-close" type="button" title="Cerrar" data-i18n-title="timerHide">×</button>
     </div>
     <div class="timer-body">
       <div id="timerIdle" class="timer-view">
@@ -217,6 +218,23 @@
     </div>
   </div>
 
+    <div id="imagesWidget" class="images-widget float-window" hidden>
+    <div id="imagesHeader" class="float-header">
+      <span class="float-title" data-i18n="imagesTitle">Imágenes</span>
+      <button id="imagesCloseBtn" class="float-close" type="button" title="Ocultar" data-i18n-title="timerHide">×</button>
+    </div>
+    <div class="images-body">
+      <select id="imageWinSelect"></select>
+      <div class="images-view">
+        <img id="imageWinImg" alt="" hidden />
+        <div id="imageWinEmpty" class="images-empty">
+          <span id="imageWinMessage"></span>
+          <button id="imageWinCreateBtn" type="button" data-i18n="imageWinCreate" hidden>Crear preset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="appearanceModal" class="modal-overlay hidden">
     <div class="modal-box">
       <div class="modal-header">
@@ -229,6 +247,7 @@
         <button class="tab-btn" data-tab="text" role="tab" data-i18n="tabText">Texto</button>
         <button class="tab-btn" data-tab="sound" role="tab" data-i18n="tabSound">Sonido</button>
         <button class="tab-btn" data-tab="timer" role="tab" data-i18n="tabTimer">Temporizador</button>
+        <button class="tab-btn" data-tab="images" role="tab" data-i18n="tabImages">Imágenes</button>
         <button class="tab-btn" data-tab="themes" role="tab" data-i18n="themesSubcategory">Temas</button>
         <button class="tab-btn" data-tab="commands" role="tab" data-i18n="tabCommands">Comandos</button>
         <button class="tab-btn" data-tab="overlays" role="tab" data-i18n="tabOverlays">Overlays</button>
@@ -356,6 +375,25 @@
         </div>
         <p class="modal-note" data-i18n="timerActionsNote">Nota</p>
       </div>
+      <div class="settings-tab hidden" data-tab="images" role="tabpanel">
+        <label class="inline-label">
+          <input id="imagesShowCheckbox" type="checkbox" />
+          <span data-i18n="imagesShowLabel">Mostrar la ventana de imágenes</span>
+        </label>
+
+        <h3 data-i18n="newImagePresetTitle">Crear preset de imagen</h3>
+        <input id="newImageTitle" type="text" data-i18n-placeholder="newImageTitlePlaceholder" placeholder="Título del preset" />
+        <label data-i18n="newImageFileLabel">Imagen</label>
+        <input id="newImageFile" type="file" accept="image/*" />
+        <button id="saveImagePresetBtn" data-i18n="saveImagePresetBtn">Guardar preset</button>
+        <p id="imagePresetStatus" class="modal-note"></p>
+
+        <h3 data-i18n="imagePresetsTitle">Presets guardados</h3>
+        <select id="imageManageSelect"></select>
+        <img id="imageManagePreview" class="image-manage-preview" alt="" hidden />
+        <button id="deleteImagePresetBtn" data-i18n="deleteImagePresetBtn" hidden>Eliminar preset</button>
+        <p class="modal-note" data-i18n="imagePresetsNote">Nota</p>
+      </div>
       <div class="settings-tab hidden" data-tab="themes" role="tabpanel">
       <h3 data-i18n="themesSubcategory">Temas</h3>
       <label data-i18n="themeLabel">Carpeta de tema</label>
@@ -428,6 +466,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=27"></script>
+  <script src="app.js?v=29"></script>
 </body>
 </html>
