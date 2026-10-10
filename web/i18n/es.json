@@ -234,7 +234,7 @@
   "imagesTitle": "Imágenes",
   "imageWinNone": "— Elige una imagen —",
   "imageWinEmpty": "Todavía no hay presets de imagen.",
-  "imageWinPick": "Elige una imagen en la lista.",
+  "imageWinPick": "Elige un preset en el menú del botón 🖼.",
   "imageWinCreate": "Crear preset",
   "tabImages": "Imágenes",
   "imagesShowLabel": "Mostrar la ventana de imágenes",
@@ -252,5 +252,16 @@
   "imageStatusError": "No se pudo guardar el preset (¿el navegador bloquea el almacenamiento?).",
   "imageStatusSaved": "Preset «{title}» guardado.",
   "imageStatusUpdated": "Preset «{title}» actualizado.",
-  "imageStatusDeleted": "Preset «{title}» eliminado."
+  "imageStatusDeleted": "Preset «{title}» eliminado.",
+  "imagesMenuShow": "Mostrar ventana",
+  "imagesMenuPreset": "Preset",
+  "imageWinNoPresets": "— No hay presets —",
+  "renameImageLabel": "Cambiar nombre",
+  "renameImageBtn": "Renombrar",
+  "replaceImageLabel": "Cambiar imagen",
+  "replaceImageBtn": "Reemplazar imagen",
+  "imageStatusSameName": "Ese ya es el nombre del preset.",
+  "imageStatusNameTaken": "Ya existe un preset llamado «{title}».",
+  "imageStatusRenamed": "Preset «{old}» renombrado a «{title}».",
+  "imageStatusImageReplaced": "Imagen de «{title}» actualizada."
 }

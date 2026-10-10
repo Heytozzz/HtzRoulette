@@ -1011,10 +1011,7 @@ body.debug-mode .layout-box.layout-dragging {
   height: 300px;
   min-width: 220px;
   min-height: 180px;
-  max-width: 98vw;
-  max-height: 98vh;
-  overflow: hidden;
-  resize: both;
+  overflow: hidden; /* the size is clamped to the screen (on the grid) from JS */
 }
 
 .images-widget .float-header {
@@ -1030,10 +1027,6 @@ body.debug-mode .layout-box.layout-dragging {
   padding: 8px;
 }
 
-.images-body select {
-  width: 100%;
-}
-
 .images-view {
   position: relative;
   display: flex;
@@ -1047,9 +1040,9 @@ body.debug-mode .layout-box.layout-dragging {
 }
 
 .images-view img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* scales to fill the window, keeping the aspect ratio */
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -1077,4 +1070,131 @@ body.debug-mode .layout-box.layout-dragging {
 
 #imagesBtn.active {
   border-color: var(--theme-accent, #ffcc00);
+}
+
+/* Resize handles (4 edges + 4 corners) of the images window */
+.resize-handle {
+  position: absolute;
+  z-index: 5;
+  touch-action: none;
+}
+
+.resize-n { top: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.resize-s { bottom: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.resize-e { right: 0; top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+.resize-w { left: 0; top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+.resize-ne { top: 0; right: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+.resize-nw { top: 0; left: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+.resize-se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+.resize-sw { bottom: 0; left: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+
+/* The preset's name is the window's only title: big and bold, with the theme color underneath */
+.images-widget .float-header {
+  border-bottom: 2px solid var(--theme-accent, #ffcc00);
+  min-height: 34px;
+}
+
+.images-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Menu of the 🖼 button: switch on top, preset picker below */
+.images-menu {
+  position: fixed;
+  z-index: 45; /* above the floating windows, below the settings window (50) */
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(23, 24, 28, 0.97);
+  backdrop-filter: blur(6px);
+  border: 1px solid #2f3036;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.images-menu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.images-menu-label {
+  font-size: 12px;
+  color: #9a9aa4;
+}
+
+.images-menu select {
+  width: 100%;
+}
+
+.switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.switch .slider {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  border-radius: 22px;
+  background: #3a3b42;
+  transition: background 0.15s;
+}
+
+.switch .slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.switch input:checked + .slider {
+  background: var(--theme-accent, #ffcc00);
+}
+
+.switch input:checked + .slider::after {
+  transform: translateX(16px);
+}
+
+.switch input:focus-visible + .slider {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+
+.switch-label {
+  font-size: 14px;
+}
+
+.image-edit-box {
+  margin: 8px 0;
+}
+
+.image-edit-box button {
+  margin-top: 4px;
 }

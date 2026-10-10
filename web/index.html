@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=25" />
+  <link rel="stylesheet" href="style.css?v=29" />
 </head>
 <body>
   <header>
     <div class="header-top">
       <h1 data-i18n="title">HtzRoulette Web</h1>
       <div class="header-actions">
-        <button id="imagesBtn" class="gear-btn" title="Imágenes" data-i18n-title="imagesBtnTitle">🖼</button>
+        <button id="imagesBtn" class="gear-btn" title="Imágenes" data-i18n-title="imagesBtnTitle" aria-haspopup="true" aria-expanded="false">🖼</button>
         <button id="timerBtn" class="gear-btn" title="Temporizador" data-i18n-title="timerBtnTitle">⏱</button>
         <button id="gearBtn" class="gear-btn" title="Aspecto" data-i18n-title="settingsGearTitle">⚙</button>
       </div>
@@ -218,13 +218,24 @@
     </div>
   </div>
 
+  <div id="imagesMenu" class="images-menu" hidden>
+    <label class="switch">
+      <input id="imagesMenuToggle" type="checkbox" />
+      <span class="slider"></span>
+      <span class="switch-label" data-i18n="imagesMenuShow">Mostrar ventana</span>
+    </label>
+    <div class="images-menu-field">
+      <span class="images-menu-label" data-i18n="imagesMenuPreset">Preset</span>
+      <select id="imageWinSelect"></select>
+    </div>
+  </div>
+
     <div id="imagesWidget" class="images-widget float-window" hidden>
     <div id="imagesHeader" class="float-header">
-      <span class="float-title" data-i18n="imagesTitle">Imágenes</span>
+      <span id="imagesTitleText" class="float-title images-title"></span>
       <button id="imagesCloseBtn" class="float-close" type="button" title="Ocultar" data-i18n-title="timerHide">×</button>
     </div>
     <div class="images-body">
-      <select id="imageWinSelect"></select>
       <div class="images-view">
         <img id="imageWinImg" alt="" hidden />
         <div id="imageWinEmpty" class="images-empty">
@@ -391,6 +402,17 @@
         <h3 data-i18n="imagePresetsTitle">Presets guardados</h3>
         <select id="imageManageSelect"></select>
         <img id="imageManagePreview" class="image-manage-preview" alt="" hidden />
+        <div id="imageEditBox" class="image-edit-box" hidden>
+          <label data-i18n="renameImageLabel">Cambiar nombre</label>
+          <div class="overlay-row">
+            <input id="renameImageInput" type="text" />
+            <button id="renameImageBtn" type="button" data-i18n="renameImageBtn">Renombrar</button>
+          </div>
+          <label data-i18n="replaceImageLabel">Cambiar imagen</label>
+          <input id="replaceImageFile" type="file" accept="image/*" />
+          <button id="replaceImageBtn" type="button" data-i18n="replaceImageBtn">Reemplazar imagen</button>
+          <p id="imageEditStatus" class="modal-note"></p>
+        </div>
         <button id="deleteImagePresetBtn" data-i18n="deleteImagePresetBtn" hidden>Eliminar preset</button>
         <p class="modal-note" data-i18n="imagePresetsNote">Nota</p>
       </div>
@@ -466,6 +488,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=31"></script>
 </body>
 </html>

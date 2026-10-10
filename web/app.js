@@ -162,6 +162,15 @@ const els = {
   imagesHeader: document.getElementById('imagesHeader'),
   imagesCloseBtn: document.getElementById('imagesCloseBtn'),
   imageWinSelect: document.getElementById('imageWinSelect'),
+  imagesMenu: document.getElementById('imagesMenu'),
+  imagesMenuToggle: document.getElementById('imagesMenuToggle'),
+  imagesTitleText: document.getElementById('imagesTitleText'),
+  imageEditBox: document.getElementById('imageEditBox'),
+  renameImageInput: document.getElementById('renameImageInput'),
+  renameImageBtn: document.getElementById('renameImageBtn'),
+  replaceImageFile: document.getElementById('replaceImageFile'),
+  replaceImageBtn: document.getElementById('replaceImageBtn'),
+  imageEditStatus: document.getElementById('imageEditStatus'),
   imageWinImg: document.getElementById('imageWinImg'),
   imageWinEmpty: document.getElementById('imageWinEmpty'),
   imageWinMessage: document.getElementById('imageWinMessage'),
@@ -2917,8 +2926,8 @@ function initFloatingWindow({ el, header, settings, fallback, save }) {
 
   win.place = (x, y) => {
     const rect = el.getBoundingClientRect();
-    const maxX = Math.max(0, window.innerWidth - rect.width);
-    const maxY = Math.max(0, window.innerHeight - rect.height);
+    const maxX = Math.max(0, Math.floor((window.innerWidth - rect.width) / LAYOUT_GRID) * LAYOUT_GRID);
+    const maxY = Math.max(0, Math.floor((window.innerHeight - rect.height) / LAYOUT_GRID) * LAYOUT_GRID);
     const pos = settings.pos || fallback(rect);
     const nx = Math.min(maxX, Math.max(0, snapToGrid(x === undefined ? pos.x : x)));
     const ny = Math.min(maxY, Math.max(0, snapToGrid(y === undefined ? pos.y : y)));
@@ -2952,6 +2961,60 @@ function initFloatingWindow({ el, header, settings, fallback, save }) {
     if (!el.hidden) win.place();
   });
   return win;
+}
+
+// Resize like a normal window: handles on the 4 edges and 4 corners. Every edge that
+// moves snaps to the grid, so the window keeps its alignment with the boxes (position
+// and size always end up as multiples of the grid). Keeps min size and stays on screen.
+function initFloatingResize({ el, settings, min, save }) {
+  const floorGrid = (v) => Math.floor(v / LAYOUT_GRID) * LAYOUT_GRID;
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+  ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach((edge) => {
+    const handle = document.createElement('div');
+    handle.className = `resize-handle resize-${edge}`;
+    handle.dataset.edge = edge;
+    el.appendChild(handle);
+    let drag = null;
+
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const rect = el.getBoundingClientRect();
+      drag = {
+        id: e.pointerId, x: e.clientX, y: e.clientY,
+        left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+      };
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      let { left, top, right, bottom } = drag;
+      if (edge.includes('e')) right = clamp(snapToGrid(drag.right + dx), drag.left + min.w, floorGrid(window.innerWidth));
+      if (edge.includes('w')) left = clamp(snapToGrid(drag.left + dx), 0, drag.right - min.w);
+      if (edge.includes('s')) bottom = clamp(snapToGrid(drag.bottom + dy), drag.top + min.h, floorGrid(window.innerHeight));
+      if (edge.includes('n')) top = clamp(snapToGrid(drag.top + dy), 0, drag.bottom - min.h);
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.width = `${right - left}px`;
+      el.style.height = `${bottom - top}px`;
+      settings.pos = { x: left, y: top };
+      settings.size = { w: right - left, h: bottom - top };
+    });
+
+    const end = (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      drag = null;
+      if (handle.releasePointerCapture) {
+        try { handle.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
+      }
+      save();
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  });
 }
 
 // --- Timer widget ---
@@ -3355,6 +3418,32 @@ async function idbRequest(mode, fn) {
 const saveImagePreset = (title, image) => idbRequest('readwrite', (store) => store.put({ image, savedAt: Date.now() }, title));
 const loadImagePreset = (title) => idbRequest('readonly', (store) => store.get(title));
 const deleteImagePreset = (title) => idbRequest('readwrite', (store) => store.delete(title));
+
+// The title is the key, so renaming = copying the record under the new key and removing the old
+// one, both in the same transaction (it either fully happens or not at all).
+async function renameImagePresetDB(oldTitle, newTitle) {
+  const db = await openImagePresetsDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_PRESETS_STORE, 'readwrite');
+    const store = tx.objectStore(IMAGE_PRESETS_STORE);
+    const getOld = store.get(oldTitle);
+    const getNew = store.getKey(newTitle);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onabort = () => reject(tx.error || new Error('rename-aborted'));
+    tx.onerror = () => reject(tx.error);
+    getNew.onsuccess = () => {
+      if (getNew.result !== undefined || !getOld.result) {
+        tx.abort(); // the new title is taken, or the old preset is gone
+        return;
+      }
+      store.put(getOld.result, newTitle);
+      store.delete(oldTitle);
+    };
+  });
+}
 const listImagePresetTitles = () => idbRequest('readonly', (store) => store.getAllKeys());
 
 function saveImageSettings() {
@@ -3386,13 +3475,33 @@ function setImageStatus(key, params) {
   els.imagePresetStatus.textContent = key ? t(key, params) : '';
 }
 
+function setImageEditStatus(key, params) {
+  els.imageEditStatus.textContent = key ? t(key, params) : '';
+}
+
 function setImagesVisible(visible) {
   imageSettings.visible = visible;
   els.imagesWidget.hidden = !visible;
   els.imagesShowCheckbox.checked = visible;
+  els.imagesMenuToggle.checked = visible;
   els.imagesBtn.classList.toggle('active', visible);
   if (visible) imageWin.place();
   saveImageSettings();
+}
+
+// The 🖼 button opens a menu: a switch to turn the window on and, below it, the preset picker
+function positionImagesMenu() {
+  const button = els.imagesBtn.getBoundingClientRect();
+  const width = els.imagesMenu.offsetWidth;
+  const left = Math.min(window.innerWidth - width - 8, Math.max(8, button.right - width));
+  els.imagesMenu.style.left = `${left}px`;
+  els.imagesMenu.style.top = `${button.bottom + 6}px`;
+}
+
+function setImagesMenuOpen(open) {
+  els.imagesMenu.hidden = !open;
+  els.imagesBtn.setAttribute('aria-expanded', String(open));
+  if (open) positionImagesMenu();
 }
 
 // Fills both lists (the window's drop-down and the one used to manage presets)
@@ -3411,7 +3520,7 @@ function renderImagePresetLists() {
     });
   };
   const managed = els.imageManageSelect.value;
-  fill(els.imageWinSelect, 'imageWinNone');
+  fill(els.imageWinSelect, imagePresetTitles.length ? 'imageWinNone' : 'imageWinNoPresets');
   fill(els.imageManageSelect, 'imageManageNone');
   els.imageWinSelect.value = imageSettings.selected;
   els.imageManageSelect.value = imagePresetTitles.includes(managed) ? managed : '';
@@ -3422,6 +3531,9 @@ function renderImagePresetLists() {
 // Shows the picked preset in the window (or the matching empty message)
 async function showImagePreset(title) {
   const token = ++imageShowToken;
+  // The preset's name is the window's only title
+  els.imagesTitleText.textContent = title;
+  els.imagesTitleText.title = title;
   let url = null;
   if (title) {
     const data = await loadImagePreset(title).catch(() => null);
@@ -3443,6 +3555,10 @@ async function showImagePreset(title) {
 async function updateImageManage() {
   const title = els.imageManageSelect.value;
   els.deleteImagePresetBtn.hidden = !title;
+  els.imageEditBox.hidden = !title;
+  els.renameImageInput.value = title;
+  els.replaceImageFile.value = '';
+  setImageEditStatus('');
   if (imageManageUrl) {
     URL.revokeObjectURL(imageManageUrl);
     imageManageUrl = null;
@@ -3500,18 +3616,62 @@ async function deleteSelectedImagePreset() {
   setImageStatus('imageStatusDeleted', { title });
 }
 
+// Snaps the saved size to the grid and keeps it within the screen
+async function renameSelectedImagePreset() {
+  const oldTitle = els.imageManageSelect.value;
+  const newTitle = els.renameImageInput.value.trim();
+  if (!oldTitle) return;
+  if (!newTitle) { setImageEditStatus('imageStatusNoTitle'); return; }
+  if (newTitle === oldTitle) { setImageEditStatus('imageStatusSameName'); return; }
+  if (imagePresetTitles.includes(newTitle)) { setImageEditStatus('imageStatusNameTaken', { title: newTitle }); return; }
+  try {
+    await renameImagePresetDB(oldTitle, newTitle);
+  } catch (err) {
+    console.error('Could not rename the image preset:', err);
+    setImageEditStatus('imageStatusNameTaken', { title: newTitle });
+    return;
+  }
+  if (imageSettings.selected === oldTitle) imageSettings.selected = newTitle;
+  await refreshImagePresets();
+  els.imageManageSelect.value = newTitle;
+  await updateImageManage();
+  setImageEditStatus('imageStatusRenamed', { old: oldTitle, title: newTitle });
+}
+
+async function replaceSelectedImagePresetImage() {
+  const title = els.imageManageSelect.value;
+  const file = els.replaceImageFile.files && els.replaceImageFile.files[0];
+  if (!title) return;
+  if (!file) { setImageEditStatus('imageStatusNoFile'); return; }
+  if (!file.type.startsWith('image/')) { setImageEditStatus('imageStatusNotImage'); return; }
+  try {
+    await saveImagePreset(title, file); // same key: the title stays, the image changes
+  } catch (err) {
+    console.error('Could not replace the preset image:', err);
+    setImageEditStatus('imageStatusError');
+    return;
+  }
+  await refreshImagePresets();
+  els.imageManageSelect.value = title;
+  await updateImageManage();
+  setImageEditStatus('imageStatusImageReplaced', { title });
+}
+
 function applyImageWindowSize() {
-  const size = imageSettings.size;
-  if (!size) return;
-  const w = Math.min(Math.max(size.w, IMAGE_WIN_MIN.w), window.innerWidth);
-  const h = Math.min(Math.max(size.h, IMAGE_WIN_MIN.h), window.innerHeight);
+  const rect = els.imagesWidget.getBoundingClientRect();
+  const base = imageSettings.size || { w: rect.width, h: rect.height };
+  const floorGrid = (v) => Math.floor(v / LAYOUT_GRID) * LAYOUT_GRID;
+  const fit = (value, min, max) => Math.min(Math.max(snapToGrid(value), min), Math.max(min, floorGrid(max)));
+  const w = fit(base.w, IMAGE_WIN_MIN.w, window.innerWidth);
+  const h = fit(base.h, IMAGE_WIN_MIN.h, window.innerHeight);
   els.imagesWidget.style.width = `${w}px`;
   els.imagesWidget.style.height = `${h}px`;
+  imageSettings.size = { w, h };
 }
 
 async function initImages() {
   loadImageSettings();
-  applyImageWindowSize();
+  if (imageSettings.size) applyImageWindowSize(); // without a saved size the default from the CSS stays
 
   imageWin = initFloatingWindow({
     el: els.imagesWidget,
@@ -3521,7 +3681,16 @@ async function initImages() {
     save: saveImageSettings,
   });
 
-  els.imagesBtn.addEventListener('click', () => setImagesVisible(!imageSettings.visible));
+  els.imagesBtn.addEventListener('click', () => setImagesMenuOpen(els.imagesMenu.hidden));
+  els.imagesMenuToggle.addEventListener('change', () => setImagesVisible(els.imagesMenuToggle.checked));
+  document.addEventListener('pointerdown', (e) => {
+    if (els.imagesMenu.hidden) return;
+    if (els.imagesMenu.contains(e.target) || els.imagesBtn.contains(e.target)) return;
+    setImagesMenuOpen(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !els.imagesMenu.hidden) setImagesMenuOpen(false);
+  });
   els.imagesCloseBtn.addEventListener('click', () => setImagesVisible(false));
   els.imagesShowCheckbox.addEventListener('change', () => setImagesVisible(els.imagesShowCheckbox.checked));
   els.imageWinSelect.addEventListener('change', () => {
@@ -3535,22 +3704,23 @@ async function initImages() {
   });
   els.saveImagePresetBtn.addEventListener('click', saveImagePresetFromForm);
   els.deleteImagePresetBtn.addEventListener('click', deleteSelectedImagePreset);
+  els.renameImageBtn.addEventListener('click', renameSelectedImagePreset);
+  els.renameImageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') renameSelectedImagePreset();
+  });
+  els.replaceImageBtn.addEventListener('click', replaceSelectedImagePresetImage);
+  els.replaceImageFile.addEventListener('change', () => setImageEditStatus(''));
   els.imageManageSelect.addEventListener('change', updateImageManage);
   els.newImageTitle.addEventListener('input', () => setImageStatus(''));
   els.newImageFile.addEventListener('change', () => setImageStatus(''));
 
-  // The native resize handle changes the window size: remember it
-  if (typeof ResizeObserver !== 'undefined') {
-    let seenFirst = false; // the first notification is just the initial layout
-    new ResizeObserver(() => {
-      if (els.imagesWidget.hidden) return;
-      if (!seenFirst) { seenFirst = true; return; }
-      const rect = els.imagesWidget.getBoundingClientRect();
-      imageSettings.size = { w: Math.round(rect.width), h: Math.round(rect.height) };
-      imageWin.place();
-      saveImageSettings();
-    }).observe(els.imagesWidget);
-  }
+  initFloatingResize({ el: els.imagesWidget, settings: imageSettings, min: IMAGE_WIN_MIN, save: saveImageSettings });
+  window.addEventListener('resize', () => {
+    if (!els.imagesMenu.hidden) positionImagesMenu();
+    if (els.imagesWidget.hidden) return;
+    applyImageWindowSize();
+    imageWin.place();
+  });
 
   setImagesVisible(imageSettings.visible);
   await refreshImagePresets();
