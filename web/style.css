@@ -768,6 +768,8 @@ body.debug-mode .layout-box.layout-dragging {
 /* --- Timer widget --- */
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -1209,3 +1211,14 @@ body.debug-mode .layout-box.layout-dragging {
   resize: vertical;
 }
 .backup-textarea[hidden] { display: none; }
+
+/* "Para participar: <comando>" under the header buttons */
+.join-hint {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 14px;
+}
+.join-hint strong {
+  font-weight: 700;
+  color: var(--theme-accent, #ffcc00);
+}

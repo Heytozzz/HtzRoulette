@@ -1934,8 +1934,16 @@ els.disconnectBtn.addEventListener('click', () => {
   els.disconnectBtn.disabled = true;
 });
 
+// "Para participar: <command>" text under the header buttons
+function updateJoinHint() {
+  const el = document.getElementById('joinHintCmd');
+  if (el) el.textContent = els.joinCommandInput.value.trim() || '!join';
+}
+els.joinCommandInput.addEventListener('input', updateJoinHint);
+
 els.joinCommandInput.addEventListener('change', () => {
   state.joinCommand = els.joinCommandInput.value.trim().toLowerCase() || '!join';
+  updateJoinHint();
 });
 
 els.startJoinBtn.addEventListener('click', () => setJoinAccepted(true));
@@ -4043,6 +4051,7 @@ loadStrings().then(async () => {
     loadTwitchCredentials();
     await refreshThemeSelect();
     await applySavedState();
+    updateJoinHint();
     renderSavedLists();
     loadSoundPack(state.soundPack);
     initLayoutBoxes();

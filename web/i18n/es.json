@@ -293,5 +293,6 @@
   "backupImportConfirm": "Se reemplazará la configuración actual por la del respaldo ({themes} temas, {presets} imágenes) y la página se recargará. ¿Continuar?",
   "backupImportCancelled": "Importación cancelada.",
   "backupImportError": "No se pudo importar el respaldo (¿falta espacio en el navegador?).",
-  "backupImportDone": "Respaldo importado. Recargando…"
+  "backupImportDone": "Respaldo importado. Recargando…",
+  "joinHintLabel": "Para participar:"
 }
