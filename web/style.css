@@ -1216,7 +1216,8 @@ body.debug-mode .layout-box.layout-dragging {
 .join-hint {
   flex-basis: 100%;
   text-align: right;
-  font-size: 14px;
+  font-size: 33px; /* 150% of the title (h1 = 22px) */
+  line-height: 1.1;
 }
 .join-hint strong {
   font-weight: 700;
