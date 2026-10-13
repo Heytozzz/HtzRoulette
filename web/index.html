@@ -262,6 +262,7 @@
         <button class="tab-btn" data-tab="themes" role="tab" data-i18n="themesSubcategory">Temas</button>
         <button class="tab-btn" data-tab="commands" role="tab" data-i18n="tabCommands">Comandos</button>
         <button class="tab-btn" data-tab="overlays" role="tab" data-i18n="tabOverlays">Overlays</button>
+        <button class="tab-btn" data-tab="backup" role="tab" data-i18n="tabBackup">Respaldo</button>
         <button class="tab-btn" data-tab="debug" role="tab" data-i18n="debugSubcategory">Debug</button>
       </div>
       <div class="tab-panels">
@@ -475,6 +476,38 @@
       <div class="overlay-row"><input id="overlayLinkParticipants" type="text" readonly /><button data-copy="overlayLinkParticipants" data-i18n="copyBtn">Copiar</button></div>
       <p id="overlayStatusText" class="modal-note"></p>
       </div>
+      <div class="settings-tab hidden" data-tab="backup" role="tabpanel">
+        <h3 data-i18n="backupExportTitle">Exportar</h3>
+        <p class="modal-note" data-i18n="backupExportNote">Nota</p>
+        <label class="inline-label">
+          <input id="backupIncludeParticipants" type="checkbox" checked />
+          <span data-i18n="backupIncludeParticipants">Incluir participantes, listas guardadas y registros</span>
+        </label>
+        <label class="inline-label">
+          <input id="backupIncludeMedia" type="checkbox" checked />
+          <span data-i18n="backupIncludeMedia">Incluir temas e imágenes (solo en archivo)</span>
+        </label>
+        <label class="inline-label">
+          <input id="backupIncludeCreds" type="checkbox" />
+          <span data-i18n="backupIncludeCreds">Incluir credenciales de Twitch</span>
+        </label>
+        <p class="modal-note" data-i18n="backupCredsWarning">Aviso</p>
+        <div class="overlay-row">
+          <button id="backupExportFileBtn" type="button" data-i18n="backupExportFileBtn">Descargar archivo</button>
+          <button id="backupExportCodeBtn" type="button" data-i18n="backupExportCodeBtn">Copiar código</button>
+        </div>
+        <textarea id="backupCodeOut" class="backup-textarea" rows="3" readonly hidden></textarea>
+
+        <h3 data-i18n="backupImportTitle">Importar</h3>
+        <p class="modal-note" data-i18n="backupImportNote">Nota</p>
+        <label data-i18n="backupImportFileLabel">Archivo de respaldo</label>
+        <input id="backupImportFile" type="file" accept=".json,application/json" />
+        <button id="backupImportFileBtn" type="button" data-i18n="backupImportFileBtn">Importar archivo</button>
+        <label data-i18n="backupImportCodeLabel">O pega un código</label>
+        <textarea id="backupCodeIn" class="backup-textarea" rows="3" data-i18n-placeholder="backupImportCodePlaceholder" placeholder="HTZ1:..."></textarea>
+        <button id="backupImportCodeBtn" type="button" data-i18n="backupImportCodeBtn">Importar código</button>
+        <p id="backupStatus" class="modal-note"></p>
+      </div>
       <div class="settings-tab hidden" data-tab="debug" role="tabpanel">
       <label class="inline-label">
         <input id="debugModeCheckbox" type="checkbox" />
@@ -489,5 +522,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="app.js?v=31"></script>
+  <script src="backup.js?v=1"></script>
 </body>
 </html>

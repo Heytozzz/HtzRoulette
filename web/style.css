@@ -1198,3 +1198,14 @@ body.debug-mode .layout-box.layout-dragging {
 .image-edit-box button {
   margin-top: 4px;
 }
+
+/* Backup tab */
+.backup-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0;
+  font-family: monospace;
+  font-size: 11px;
+  resize: vertical;
+}
+.backup-textarea[hidden] { display: none; }
