@@ -294,5 +294,9 @@
   "backupImportCancelled": "Importación cancelada.",
   "backupImportError": "No se pudo importar el respaldo (¿falta espacio en el navegador?).",
   "backupImportDone": "Respaldo importado. Recargando…",
-  "joinHintLabel": "Para participar:"
+  "joinHintLabel": "Para participar:",
+  "groupDraw": "Sorteo",
+  "groupSpin": "Giro",
+  "groupSubs": "Subs",
+  "groupList": "Lista"
 }

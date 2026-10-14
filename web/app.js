@@ -90,6 +90,8 @@ const bgTimers = (() => {
 })();
 
 const PLACEHOLDER_SLICE_COUNT = 8;
+const WHEEL_FONT = '"DM Sans", "Segoe UI", sans-serif';
+let wheelAccent = '#ffcc00'; // theme color, used by the wheel's rim
 
 const els = {
   channelInput: document.getElementById('channelInput'),
@@ -245,17 +247,25 @@ SUB_STYLE_KEYS.forEach((k) => {
 const ctx = els.wheelCanvas.getContext('2d');
 const PALETTE_HUES = { red: 0, blue: 210, green: 120, purple: 275, gray: 0 };
 
-function getSliceColor(index, count) {
+// h/s/l of a slice: brighter than before (the red palette no longer turns brown),
+// going from a base color to a lighter one and back as the wheel fills up.
+function slicePaint(index, count) {
   if (state.colorPalette === 'rainbow') {
-    const hue = (index * 360) / count;
-    return `hsl(${hue}, 65%, 50%)`;
+    const h = (index * 360) / count;
+    return { h, s: 70, l: 52, color: `hsl(${h}, 70%, 52%)` };
   }
-  const hue = PALETTE_HUES[state.colorPalette] ?? PALETTE_HUES.red;
+  const gray = state.colorPalette === 'gray';
+  const base = PALETTE_HUES[state.colorPalette] ?? PALETTE_HUES.red;
   const posInCircle = index / count;
   const triangle = posInCircle < 0.5 ? posInCircle * 2 : (1 - posInCircle) * 2;
-  const lightness = 18 + triangle * 40;
-  const saturation = state.colorPalette === 'gray' ? 0 : 12 + triangle * 68;
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  const h = gray ? 0 : (base + (index % 2 ? 10 : -10) + 360) % 360;
+  const sat = gray ? 0 : Math.round(78 + triangle * 18);
+  const l = Math.round((gray ? 30 : 44) + triangle * (gray ? 36 : 20));
+  return { h, s: sat, l, color: `hsl(${h}, ${sat}%, ${l}%)` };
+}
+
+function getSliceColor(index, count) {
+  return slicePaint(index, count).color;
 }
 
 // --- i18n ---
@@ -464,19 +474,19 @@ function renderParticipants() {
     subBtn.addEventListener('click', () => toggleSubByName(name));
     actions.appendChild(subBtn);
 
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = '×';
-    removeBtn.title = t('removeTitle');
-    removeBtn.addEventListener('click', () => removeParticipantByName(name));
-    actions.appendChild(removeBtn);
-
     const dupBtn = document.createElement('button');
     dupBtn.className = 'dup-btn';
     dupBtn.textContent = '+';
     dupBtn.title = t('duplicateTitle');
     dupBtn.addEventListener('click', () => duplicateParticipantByName(name));
     actions.appendChild(dupBtn);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.title = t('removeTitle');
+    removeBtn.addEventListener('click', () => removeParticipantByName(name));
+    actions.appendChild(removeBtn);
 
     li.appendChild(actions);
     els.participantList.appendChild(li);
@@ -725,8 +735,11 @@ function drawWheel() {
   ctx.clearRect(0, 0, width, height);
   const count = state.participants.length;
 
+  drawRim(cx, cy, radius);
+
   if (count === 0) {
     drawColorSlices(cx, cy, radius, PLACEHOLDER_SLICE_COUNT, []);
+    drawHub(cx, cy, radius);
     drawPointers(cx, cy, radius);
     return;
   }
@@ -742,14 +755,57 @@ function drawWheel() {
     drawColorSlices(cx, cy, radius, count, state.participants);
   }
 
+  drawHub(cx, cy, radius);
   drawPointers(cx, cy, radius);
   updateEffectsLoop();
 }
 
+// Dark rim with a ring of bulbs (they blink while the wheel is spinning). It lives in the
+// canvas margin that is reserved for the arrows.
+function drawRim(cx, cy, radius) {
+  const k = radius / POINTER_REF_RADIUS;
+  const outer = radius + 24 * k;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  ctx.arc(0, 0, outer - k, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10, 8, 18, 0.85)';
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, 2 * k);
+  ctx.strokeStyle = wheelAccent;
+  ctx.stroke();
+  const bulbs = 28;
+  const phase = state.animating ? Math.floor(performance.now() / 90) : 0;
+  for (let i = 0; i < bulbs; i += 1) {
+    const a = (i / bulbs) * Math.PI * 2;
+    const lit = (i + phase) % 2 === 0;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * (radius + 12 * k), Math.sin(a) * (radius + 12 * k), 3.2 * k, 0, Math.PI * 2);
+    ctx.fillStyle = lit ? '#fff6c8' : 'rgba(255, 255, 255, 0.22)';
+    ctx.shadowColor = lit ? '#ffd84a' : 'transparent';
+    ctx.shadowBlur = lit ? 10 * k : 0;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHub(cx, cy, radius) {
+  const k = radius / POINTER_REF_RADIUS;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 17 * k, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10, 8, 18, 0.9)';
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, 3 * k);
+  ctx.strokeStyle = wheelAccent;
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Normal users' wheel text: white, with an optional drop shadow.
 // (Canvas shadow offsets are in screen space, so the "light" stays fixed while the wheel spins.)
-function drawUserText(text, x, y, fontSize) {
-  ctx.fillStyle = '#fff';
+function drawUserText(text, x, y, fontSize, color = '#fff') {
+  ctx.fillStyle = color;
   if (!state.userShadow.enabled) {
     ctx.fillText(text, x, y);
     return;
@@ -764,7 +820,7 @@ function drawUserText(text, x, y, fontSize) {
     const ly = (-m.b * offset + m.a * offset) / det;
     ctx.fillStyle = state.userShadow.color;
     ctx.fillText(text, x + lx, y + ly);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = color;
     ctx.fillText(text, x, y);
     return;
   }
@@ -809,7 +865,7 @@ function pseudoRandom(n) {
 
 function subFontString(fontSize) {
   const st = state.subStyles;
-  return `${st.italic ? 'italic ' : ''}${st.bold ? 'bold ' : ''}${fontSize}px Segoe UI`;
+  return `${st.italic ? 'italic ' : ''}${st.bold ? 'bold ' : ''}${fontSize}px ${WHEEL_FONT}`;
 }
 
 const NO_EFFECTS = { bounce: false, wave: false, blink: false, glitch: false, rainbow: false, gradient: false };
@@ -826,7 +882,7 @@ function layoutSubText(g, name, fontSize) {
     if (img) badge = { kind: 'image', img };
     else if (!state.subBadgeUrl) badge = { kind: 'crown' }; // no icon configured: fall back to the crown
   }
-  const crownFont = `${Math.round(fontSize * 1.15)}px Segoe UI`;
+  const crownFont = `${Math.round(fontSize * 1.15)}px ${WHEEL_FONT}`;
   let badgeSize = 0;
   if (badge && badge.kind === 'image') {
     badgeSize = fontSize * 1.15;
@@ -1064,36 +1120,77 @@ function updateEffectsLoop() {
   if (effectsRaf === null && subEffectsActive()) effectsRaf = requestAnimationFrame(effectsTick);
 }
 
+function subNameWidth(name, fontSize) {
+  if (!subMeasureCtx) subMeasureCtx = document.createElement('canvas').getContext('2d');
+  const layout = layoutSubText(subMeasureCtx, name, fontSize);
+  return layout.badgeW + layout.textW;
+}
+
+// Slices under an arrow pop out a little and light up. Names on the left half of the
+// wheel are turned around so they always read upright.
 function drawColorSlices(cx, cy, radius, count, names) {
   const sliceAngle = (Math.PI * 2) / count;
+  const wheelRot = wheelDrawRotation();
+  const under = new Set(
+    names.length ? getSelectionForRotation(state.rotation, pointerCountForCurrentSettings()).indices : [],
+  );
+  const popScale = 1.035;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(wheelDrawRotation());
+  ctx.rotate(wheelRot);
 
-  for (let i = 0; i < count; i += 1) {
+  const paint = (i, hl) => {
     const start = i * sliceAngle;
+    const p = slicePaint(i, count);
+    ctx.save();
+    if (hl) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+      ctx.shadowBlur = 22;
+      ctx.shadowOffsetY = 4;
+    }
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.arc(0, 0, radius, start, start + sliceAngle);
+    ctx.arc(0, 0, hl ? radius * popScale : radius, start, start + sliceAngle);
     ctx.closePath();
-    ctx.fillStyle = getSliceColor(i, count);
+    ctx.fillStyle = hl ? `hsl(${p.h}, ${p.s}%, ${Math.min(p.l + 14, 74)}%)` : p.color;
     ctx.fill();
-  }
+    ctx.restore();
+    if (hl || count <= 120) {
+      ctx.lineWidth = hl ? 2.5 : 1.2;
+      ctx.strokeStyle = hl ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.35)';
+      ctx.stroke();
+    }
+  };
+  for (let i = 0; i < count; i += 1) if (!under.has(i)) paint(i, false);
+  under.forEach((i) => paint(i, true));
 
   // Names in a second pass: a sub's glow is no longer painted over by the next
   // slice, and a single clip to the wheel's disc serves every name.
   ctx.save();
   clipToWheelDisc(radius);
-  const fontSize = Math.round(21 * state.wheelFontScale);
-  ctx.font = `${fontSize}px Segoe UI`;
+  const baseFont = Math.round(21 * state.wheelFontScale);
   ctx.textAlign = 'right';
   for (let i = 0; i < count; i += 1) {
     if (!names[i]) continue;
+    const hl = under.has(i);
+    const fontSize = hl ? Math.round(baseFont * 1.1) : baseFont;
+    const angle = i * sliceAngle + sliceAngle / 2;
+    const flip = Math.cos(wheelRot + angle) < 0;
+    const edge = radius - 10;
+    ctx.font = `${fontSize}px ${WHEEL_FONT}`;
     ctx.save();
-    ctx.rotate(i * sliceAngle + sliceAngle / 2);
-    if (state.subNames.has(names[i])) drawSubText(names[i], radius - 10, 4, fontSize, i);
-    else drawUserText(names[i], radius - 10, 4, fontSize);
+    ctx.rotate(angle);
+    if (flip) ctx.rotate(Math.PI);
+    if (state.subNames.has(names[i])) {
+      drawSubText(names[i], flip ? -edge + subNameWidth(names[i], fontSize) : edge, 4, fontSize, i);
+    } else {
+      const p = slicePaint(i, count);
+      const light = hl ? Math.min(p.l + 14, 74) : p.l;
+      if (flip) ctx.textAlign = 'left';
+      drawUserText(names[i], flip ? -edge : edge, 4, fontSize, light > 56 ? '#14101c' : '#fff');
+    }
     ctx.restore();
+    ctx.textAlign = 'right';
   }
   ctx.restore();
   ctx.restore();
@@ -1141,7 +1238,7 @@ function drawAvatarSlices(cx, cy, radius, count, getImageForName) {
     ctx.textAlign = 'right';
     const nameIsSub = state.subNames.has(name);
     const fontSize = Math.round(20 * state.wheelFontScale);
-    ctx.font = `${fontSize}px Segoe UI`;
+    ctx.font = `${fontSize}px ${WHEEL_FONT}`;
     if (nameIsSub) {
       clipToWheelDisc(radius);
       drawSubText(name, radius - 8, radius * 0.25, fontSize, i);
@@ -1206,8 +1303,11 @@ function drawPointers(cx, cy, radius) {
     ctx.lineTo(radius + 24 * k, -14 * k);
     ctx.lineTo(radius + 24 * k, 14 * k);
     ctx.closePath();
-    ctx.fillStyle = '#ffcc00';
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 8 * k;
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1, 1.5 * k);
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
@@ -2229,6 +2329,7 @@ function applyThemeAccent(palette) {
   const [accent, hover] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
   document.documentElement.style.setProperty('--theme-accent', accent);
   document.documentElement.style.setProperty('--theme-accent-hover', hover);
+  wheelAccent = accent;
   refreshSubColorInputs();
 }
 
@@ -2741,13 +2842,9 @@ const layoutBoxEl = (id) => document.querySelector(`[data-layout-id="${id}"]`);
 const snapToGrid = (value) => Math.round(value / LAYOUT_GRID) * LAYOUT_GRID;
 const isCustomLayout = () => document.body.classList.contains('custom-layout');
 
-// Keeps the free layout consistent: "Eliminados" is as tall as the wheel, and
-// the page is tall enough for the lowest box.
+// Keeps the free layout consistent: the page is tall enough for the lowest box.
 function refreshLayoutMetrics() {
   if (!isCustomLayout()) return;
-  const wheel = layoutBoxEl('wheel');
-  const eliminated = layoutBoxEl('eliminated');
-  if (wheel && eliminated) eliminated.style.height = `${wheel.offsetHeight}px`;
   let bottom = 0;
   LAYOUT_BOXES.forEach(({ id }) => {
     const el = layoutBoxEl(id);
@@ -4062,6 +4159,7 @@ loadStrings().then(async () => {
   renderLogs();
   updateSettingsVisibility();
   drawWheel();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawWheel());
   if (IS_OVERLAY) startOverlayClient();
   else startOverlayHost();
 });

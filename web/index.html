@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>HtzRoulette Web</title>
-  <link rel="stylesheet" href="style.css?v=29" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=30" />
 </head>
 <body>
   <header>
@@ -20,17 +23,17 @@
     <div class="connection-bar">
       <label data-i18n="channelLabel">Canal de Twitch</label>
       <input id="channelInput" type="text" data-i18n-placeholder="channelPlaceholder" placeholder="nombre_del_canal" />
-      <button id="connectBtn" data-i18n="connect">Conectar</button>
+      <button id="connectBtn" class="primary" data-i18n="connect">Conectar</button>
       <button id="disconnectBtn" data-i18n="disconnect" disabled>Desconectar</button>
       <span id="statusText" data-i18n="statusDisconnected">Desconectado</span>
     </div>
     <div class="join-command-bar">
       <label data-i18n="joinCommandLabel">Comando para unirse</label>
       <input id="joinCommandInput" type="text" value="!join" />
-      <button id="startJoinBtn" data-i18n="startJoinBtn">Aceptar ingresos</button>
+      <button id="startJoinBtn" class="primary" data-i18n="startJoinBtn">Aceptar ingresos</button>
       <button id="stopJoinBtn" data-i18n="stopJoinBtn" disabled>Detener ingresos</button>
       <span id="joinStatusText" data-i18n="joinStopped">Ingresos detenidos</span>
-      <label class="inline-label">
+      <label class="inline-label tog">
         <input id="subsOnlyCheckbox" type="checkbox" />
         <span data-i18n="subsOnlyLabel">Solo suscriptores</span>
       </label>
@@ -39,16 +42,13 @@
   </header>
 
   <main>
-    <div class="left-column">
+    <div class="left-column"><div class="fill-wrap">
       <section class="participants">
         <h2 data-i18n="participantsTitle">Participantes</h2>
         <ul id="participantList"></ul>
-      </section>
-
-      <section class="participants-controls">
         <div class="add-participant">
           <input id="manualNameInput" type="text" data-i18n-placeholder="manualNamePlaceholder" placeholder="Nombre" />
-          <label class="inline-label">
+          <label class="inline-label tog">
             <input id="manualSubCheckbox" type="checkbox" />
             <span data-i18n="isSubLabel">Es sub</span>
           </label>
@@ -57,34 +57,13 @@
             <option value="2" data-i18n="tier2">Tier 2</option>
             <option value="3" data-i18n="tier3">Tier 3</option>
           </select>
-          <button id="manualAddBtn" data-i18n="addBtn">Añadir</button>
+          <button id="manualAddBtn" class="primary" data-i18n="addBtn">Añadir</button>
         </div>
-
-        <button id="shuffleBtn" data-i18n="shuffleBtn">Barajear</button>
-
-        <div class="import-export">
-          <div class="import-export-buttons">
-            <button id="exportBtn" data-i18n="exportBtn">Exportar</button>
-            <button id="importBtn" data-i18n="importBtn">Importar</button>
-          </div>
-          <textarea id="importExportArea" rows="4" data-i18n-placeholder="importExportPlaceholder" placeholder="Un nombre por línea"></textarea>
-        </div>
-
-        <button id="resetBtn" class="reset-btn" data-i18n="reset">Reiniciar lista</button>
       </section>
-
-      <section class="logs-box">
-        <h3 data-i18n="winnersLog">Ganadores</h3>
-        <ul id="winnersLogList"></ul>
-      </section>
-    </div>
+    </div></div>
 
     <section class="wheel-section">
       <div class="wheel-stage">
-        <div class="eliminated-panel">
-          <h3 data-i18n="eliminatedLog">Eliminados</h3>
-          <ul id="eliminatedLogList"></ul>
-        </div>
         <div id="wheelBox" class="wheel-box">
           <canvas id="wheelCanvas" width="560" height="560"></canvas>
         </div>
@@ -95,73 +74,104 @@
       </div>
     </section>
 
-    <section class="settings">
-      <h2 data-i18n="settingsTitle">Configuración</h2>
-
-      <label data-i18n="spinDurationLabel">Duración del giro (segundos)</label>
-      <input id="spinDurationInput" type="number" min="1" max="15" step="0.5" value="4" />
-
-      <label data-i18n="spinStyleLabel">Modo de giro</label>
-      <select id="spinStyleSelect">
-        <option value="wheel" data-i18n="spinStyleWheel">Normal</option>
-        <option value="arrows" data-i18n="spinStyleArrows">Girar las flechas</option>
-      </select>
-
-      <label data-i18n="modeLabel">Modo</label>
-      <select id="modeSelect">
-        <option value="normal" data-i18n="modeNormal">Normal</option>
-        <option value="elimination" data-i18n="modeElimination">Eliminatoria</option>
-        <option value="winners" data-i18n="modeWinners">Ganadores múltiples</option>
-      </select>
-
-      <div id="eliminationOptions" class="mode-options hidden">
-        <label data-i18n="eliminationSubLabel">Tipo de eliminatoria</label>
-        <select id="eliminationSubMode">
-          <option value="simple" data-i18n="eliminationSimple">Sencilla</option>
-          <option value="multiple" data-i18n="eliminationMultiple">Múltiple</option>
-        </select>
-        <div id="eliminationArrowRow" class="hidden">
-          <label data-i18n="arrowCountLabel">Número de flechas</label>
-          <input id="eliminationArrowCount" type="number" min="2" max="8" value="2" />
+    <div class="right-column"><div class="fill-wrap">
+        <div class="eliminated-panel">
+          <h3 data-i18n="eliminatedLog">Eliminados</h3>
+          <ul id="eliminatedLogList"></ul>
         </div>
-        <label data-i18n="finalWinnersCountLabel">Ganadores finales</label>
-        <input id="eliminationFinalWinnersCount" type="number" min="1" max="8" value="1" />
-      </div>
+      <section class="logs-box">
+        <h3 data-i18n="winnersLog">Ganadores</h3>
+        <ul id="winnersLogList"></ul>
+      </section>
+    </div></div>
 
-      <div id="winnersOptions" class="mode-options hidden">
-        <label data-i18n="winnersSubLabel">Tipo de selección</label>
-        <select id="winnersSubMode">
-          <option value="sequential" data-i18n="winnersSequential">Varios giros</option>
-          <option value="simultaneous" data-i18n="winnersSimultaneous">Simultáneo</option>
-        </select>
-        <label data-i18n="winnersCountLabel">Número de ganadores</label>
-        <input id="winnersCountInput" type="number" min="2" max="8" value="2" />
-      </div>
+    <div class="options-row">
+      <section class="settings">
+        <div class="opts-grid">
+          <div class="grp">
+            <h3 data-i18n="groupDraw">Sorteo</h3>
+            <label data-i18n="modeLabel">Modo</label>
+            <select id="modeSelect">
+              <option value="normal" data-i18n="modeNormal">Normal</option>
+              <option value="elimination" data-i18n="modeElimination">Eliminatoria</option>
+              <option value="winners" data-i18n="modeWinners">Ganadores múltiples</option>
+            </select>
+            <div id="eliminationOptions" class="mode-options hidden">
+              <label data-i18n="eliminationSubLabel">Tipo de eliminatoria</label>
+              <select id="eliminationSubMode">
+                <option value="simple" data-i18n="eliminationSimple">Sencilla</option>
+                <option value="multiple" data-i18n="eliminationMultiple">Múltiple</option>
+              </select>
+              <div id="eliminationArrowRow" class="hidden">
+                <label data-i18n="arrowCountLabel">Número de flechas</label>
+                <input id="eliminationArrowCount" type="number" min="2" max="8" value="2" />
+              </div>
+              <label data-i18n="finalWinnersCountLabel">Ganadores finales</label>
+              <input id="eliminationFinalWinnersCount" type="number" min="1" max="8" value="1" />
+            </div>
+            <div id="winnersOptions" class="mode-options hidden">
+              <label data-i18n="winnersSubLabel">Tipo de selección</label>
+              <select id="winnersSubMode">
+                <option value="sequential" data-i18n="winnersSequential">Varios giros</option>
+                <option value="simultaneous" data-i18n="winnersSimultaneous">Simultáneo</option>
+              </select>
+              <label data-i18n="winnersCountLabel">Número de ganadores</label>
+              <input id="winnersCountInput" type="number" min="2" max="8" value="2" />
+            </div>
+          </div>
 
-      <div id="autoModeRow" class="mode-options hidden">
-        <label class="inline-label">
-          <input id="autoModeCheckbox" type="checkbox" />
-          <span data-i18n="autoModeLabel">Modo automático</span>
-        </label>
-        <label data-i18n="autoWaitLabel">Espera entre giros (segundos)</label>
-        <input id="autoWaitInput" type="number" min="0" max="30" step="0.5" value="3" />
-      </div>
+          <div class="grp">
+            <h3 data-i18n="groupSpin">Giro</h3>
+            <label data-i18n="spinDurationLabel">Duración del giro (segundos)</label>
+            <input id="spinDurationInput" type="number" min="1" max="15" step="0.5" value="4" />
+            <label data-i18n="spinStyleLabel">Modo de giro</label>
+            <select id="spinStyleSelect">
+              <option value="wheel" data-i18n="spinStyleWheel">Normal</option>
+              <option value="arrows" data-i18n="spinStyleArrows">Girar las flechas</option>
+            </select>
+            <div id="autoModeRow" class="mode-options hidden">
+              <label class="inline-label tog">
+                <input id="autoModeCheckbox" type="checkbox" />
+                <span data-i18n="autoModeLabel">Modo automático</span>
+              </label>
+              <label data-i18n="autoWaitLabel">Espera entre giros (segundos)</label>
+              <input id="autoWaitInput" type="number" min="0" max="30" step="0.5" value="3" />
+            </div>
+          </div>
 
-      <div class="mode-options">
-        <label class="inline-label">
-          <input id="subBonusCheckbox" type="checkbox" />
-          <span data-i18n="subBonusLabel">Activar bonificación de sub</span>
-        </label>
-        <div id="subBonusRow" class="hidden">
-          <label data-i18n="extraTier1Label">Extra Tier 1</label>
-          <input id="subExtraTier1" type="number" min="0" max="20" value="1" />
-          <label data-i18n="extraTier2Label">Extra Tier 2</label>
-          <input id="subExtraTier2" type="number" min="0" max="20" value="2" />
-          <label data-i18n="extraTier3Label">Extra Tier 3</label>
-          <input id="subExtraTier3" type="number" min="0" max="20" value="3" />
+          <div class="grp">
+            <h3 data-i18n="groupSubs">Subs</h3>
+            <div class="mode-options">
+              <label class="inline-label tog">
+                <input id="subBonusCheckbox" type="checkbox" />
+                <span data-i18n="subBonusLabel">Activar bonificación de sub</span>
+              </label>
+              <div id="subBonusRow" class="hidden">
+                <label data-i18n="extraTier1Label">Extra Tier 1</label>
+                <input id="subExtraTier1" type="number" min="0" max="20" value="1" />
+                <label data-i18n="extraTier2Label">Extra Tier 2</label>
+                <input id="subExtraTier2" type="number" min="0" max="20" value="2" />
+                <label data-i18n="extraTier3Label">Extra Tier 3</label>
+                <input id="subExtraTier3" type="number" min="0" max="20" value="3" />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section class="participants-controls">
+        <h3 data-i18n="groupList">Lista</h3>
+        <button id="shuffleBtn" data-i18n="shuffleBtn">Barajear</button>
+        <div class="import-export">
+          <div class="import-export-buttons">
+            <button id="exportBtn" data-i18n="exportBtn">Exportar</button>
+            <button id="importBtn" data-i18n="importBtn">Importar</button>
+          </div>
+          <textarea id="importExportArea" rows="4" data-i18n-placeholder="importExportPlaceholder" placeholder="Un nombre por línea"></textarea>
+        </div>
+        <button id="resetBtn" class="reset-btn" data-i18n="reset">Reiniciar lista</button>
+      </section>
+    </div>
   </main>
 
     <div id="timerWidget" class="timer-widget float-window" hidden>
@@ -522,7 +532,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=33"></script>
   <script src="backup.js?v=1"></script>
 </body>
 </html>
