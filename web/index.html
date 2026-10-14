@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=32" />
+  <link rel="stylesheet" href="style.css?v=33" />
 </head>
 <body>
   <header>
@@ -83,6 +83,11 @@
       <div id="messagesBox" class="messages-box">
         <div id="winnerText" data-idle="Haz clic en la ruleta para girar" data-i18n-idle="spinHint"></div>
         <div id="modeStatus"></div>
+        <label id="autoSwitch" class="sw auto-sw hidden">
+          <input id="autoModeCheckbox" type="checkbox" />
+          <span class="knob"></span>
+          <span class="sw-label" data-i18n="autoModeLabel">Modo automático</span>
+        </label>
       </div>
     </section>
 
@@ -146,10 +151,6 @@
               <option value="arrows" data-i18n="spinStyleArrows">Girar las flechas</option>
             </select>
             <div id="autoModeRow" class="mode-options hidden">
-              <label class="inline-label tog">
-                <input id="autoModeCheckbox" type="checkbox" />
-                <span data-i18n="autoModeLabel">Modo automático</span>
-              </label>
               <label data-i18n="autoWaitLabel">Espera entre giros (segundos)</label>
               <input id="autoWaitInput" type="number" min="0" max="30" step="0.5" value="3" />
             </div>
@@ -304,10 +305,14 @@
       <label data-i18n="colorPaletteLabel">Paleta de colores</label>
       <select id="colorPaletteSelect">
         <option value="red" data-i18n="presetRed">Rojo</option>
-        <option value="blue" data-i18n="presetBlue">Azul</option>
-        <option value="green" data-i18n="presetGreen">Verde</option>
+        <option value="pink" data-i18n="presetPink">Rosa</option>
         <option value="purple" data-i18n="presetPurple">Morado</option>
+        <option value="blue" data-i18n="presetBlue">Azul</option>
+        <option value="cyan" data-i18n="presetCyan">Celeste</option>
+        <option value="green" data-i18n="presetGreen">Verde</option>
+        <option value="yellow" data-i18n="presetYellow">Amarillo</option>
         <option value="gray" data-i18n="presetGray">Gris</option>
+        <option value="black" data-i18n="presetBlack">Negro</option>
         <option value="rainbow" data-i18n="presetRainbow">Arcoíris</option>
       </select>
 
@@ -551,7 +556,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
   <script src="backup.js?v=1"></script>
 </body>
 </html>

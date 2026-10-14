@@ -311,5 +311,9 @@
   "switchJoinOff": "Aceptar ingresos",
   "switchJoinOn": "Ingresos abiertos",
   "switchJoinTitleOff": "Aceptar ingresos por comando",
-  "switchJoinTitleOn": "Detener ingresos"
+  "switchJoinTitleOn": "Detener ingresos",
+  "presetPink": "Rosa",
+  "presetCyan": "Celeste",
+  "presetYellow": "Amarillo",
+  "presetBlack": "Negro"
 }

@@ -1304,7 +1304,7 @@ button {
 button:hover:not(:disabled) { background: var(--accent-soft); }
 button:active:not(:disabled) { transform: scale(0.96); }
 button:disabled { background: rgba(255, 255, 255, 0.04); color: var(--muted); }
-button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 700; }
+button.primary { background: var(--accent); border-color: transparent; color: var(--on-accent, #fff); font-weight: 700; }
 button.primary:hover:not(:disabled) { background: var(--theme-accent-hover, var(--accent)); }
 .gear-btn { width: 42px; height: 42px; padding: 0; border-radius: 50%; font-size: 18px; background: var(--chip); border: 1px solid var(--glass-edge); }
 .gear-btn:hover { background: var(--accent-soft); }
@@ -1483,7 +1483,7 @@ body:not(.custom-layout) .participants-controls, body:not(.custom-layout) .wheel
 
 .seg { display: flex; background: var(--chip); border-radius: 14px; padding: 3px; gap: 3px; grid-column: 1 / -1; }
 .seg button { flex: 1; border: 0; background: transparent; border-radius: 11px; padding: 7px 8px; }
-.seg button.on { background: var(--accent); color: #fff; font-weight: 700; }
+.seg button.on { background: var(--accent); color: var(--on-accent, #fff); font-weight: 700; }
 .participants-controls { gap: 9px; }
 .participants-controls .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .participants-controls .reset-btn { background: var(--chip); }
@@ -1553,3 +1553,22 @@ body:not(.custom-layout) main #wheelCanvas { width: min(100cqw, 100cqh, var(--wh
   main { min-height: 0; padding: 14px 12px 18px; }
   body:not(.custom-layout) .wheel-stage { flex: none; height: min(100vw, 520px); }
 }
+
+/* switch made from a label + checkbox (the auto mode switch in the wheel panel) */
+.sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+label.sw { cursor: pointer; background: var(--chip); border: 1px solid var(--glass-edge); border-radius: 14px; }
+.sw:has(input:checked) { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.sw:has(input:checked) .knob { background: var(--accent); }
+.sw:has(input:checked) .knob::after { transform: translateX(12px); }
+.sw:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wheel-section { position: relative; }
+.auto-sw { position: absolute; right: 16px; bottom: 14px; }
+body.custom-layout .auto-sw { position: static; margin-top: 4px; }
+
+/* palette circles: always round, ten of them on one row */
+.participants-controls .swatches { flex-wrap: wrap; justify-content: space-between; gap: 6px 4px; }
+.participants-controls .swatches button { flex: none; width: 22px; height: 22px; min-width: 22px; padding: 0; border-radius: 50%; line-height: 0; }
+/* a strip at the bottom of the wheel panel for the auto switch, so it never covers the message */
+.wheel-section { padding-bottom: 54px; }
+.auto-sw { bottom: 12px; }
+body.custom-layout .wheel-section { padding-bottom: 0; }

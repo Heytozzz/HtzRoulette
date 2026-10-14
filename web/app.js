@@ -245,23 +245,37 @@ SUB_STYLE_KEYS.forEach((k) => {
 });
 
 const ctx = els.wheelCanvas.getContext('2d');
-const PALETTE_HUES = { red: 355, blue: 215, green: 145, purple: 275, gray: 0 };
+const PALETTE_HUES = { red: 355, pink: 325, purple: 275, blue: 215, cyan: 195, green: 145, yellow: 48, gray: 0, black: 0 };
 
 // h/s/l of a slice: brighter than before (the red palette no longer turns brown),
 // going from a base color to a lighter one and back as the wheel fills up.
 function slicePaint(index, count) {
   if (state.colorPalette === 'rainbow') {
     const h = (index * 360) / count;
-    return { h, s: 70, l: 52, color: `hsl(${h}, 70%, 52%)` };
+    return { h, s: 70, l: 52, color: `hsl(${h}, 70%, 52%)`, edge: 'rgba(0, 0, 0, 0.35)' };
   }
-  const gray = state.colorPalette === 'gray';
+  const black = state.colorPalette === 'black';
+  const mono = black || state.colorPalette === 'gray';
   const base = PALETTE_HUES[state.colorPalette] ?? PALETTE_HUES.red;
   const posInCircle = index / count;
   const triangle = posInCircle < 0.5 ? posInCircle * 2 : (1 - posInCircle) * 2;
-  const h = gray ? 0 : (base + (index % 2 ? 10 : -10) + 360) % 360;
-  const sat = gray ? 0 : Math.round(78 + triangle * 18);
-  const l = Math.round((gray ? 30 : 44) + triangle * (gray ? 36 : 20));
-  return { h, s: sat, l, color: `hsl(${h}, ${sat}%, ${l}%)` };
+  const h = mono ? 0 : (base + (index % 2 ? 10 : -10) + 360) % 360;
+  const sat = mono ? 0 : Math.round(78 + triangle * 18);
+  const l = Math.round(black ? 7 + triangle * 20 : (mono ? 30 : 44) + triangle * (mono ? 36 : 20));
+  return { h, s: sat, l, color: `hsl(${h}, ${sat}%, ${l}%)`, edge: black ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.35)' };
+}
+
+// Relative luminance (0..1) of an hsl color: decides between dark and white text on a slice
+function lumaOf(h, s, l) {
+  const sat = s / 100;
+  const lig = l / 100;
+  const a = sat * Math.min(lig, 1 - lig);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    return lig - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(f(0)) + 0.7152 * lin(f(8)) + 0.0722 * lin(f(4));
 }
 
 function getSliceColor(index, count) {
@@ -346,6 +360,8 @@ function updateSettingsVisibility() {
 
   const canAuto = mode === 'elimination' || (mode === 'winners' && els.winnersSubMode.value === 'sequential');
   els.autoModeRow.classList.toggle('hidden', !canAuto);
+  const autoSwitch = document.getElementById('autoSwitch');
+  if (autoSwitch) autoSwitch.classList.toggle('hidden', !canAuto);
   els.subBonusRow.classList.toggle('hidden', !els.subBonusCheckbox.checked);
   document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
   syncPaletteSwatches();
@@ -1178,7 +1194,7 @@ function drawColorSlices(cx, cy, radius, count, names) {
     ctx.restore();
     if (hl || count <= 120) {
       ctx.lineWidth = hl ? 2.5 : 1.2;
-      ctx.strokeStyle = hl ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.35)';
+      ctx.strokeStyle = hl ? 'rgba(255, 255, 255, 0.85)' : p.edge;
       ctx.stroke();
     }
   };
@@ -1208,7 +1224,7 @@ function drawColorSlices(cx, cy, radius, count, names) {
       const p = slicePaint(i, count);
       const light = hl ? Math.min(p.l + 14, 74) : p.l;
       if (flip) ctx.textAlign = 'left';
-      drawUserText(names[i], flip ? -edge : edge, 4, fontSize, light > 56 ? '#14101c' : '#fff');
+      drawUserText(names[i], flip ? -edge : edge, 4, fontSize, lumaOf(p.h, p.s, light) > 0.4 ? '#14101c' : '#fff');
     }
     ctx.restore();
     ctx.textAlign = 'right';
@@ -2148,12 +2164,17 @@ els.appearanceModal.addEventListener('click', (e) => {
 });
 
 const THEME_ACCENT_COLORS = {
-  red: ['#f15562', '#f47b85'],
-  blue: ['#5596f1', '#7badf4'],
-  green: ['#55f196', '#7bf4ad'],
-  purple: ['#b055f1', '#c27bf4'],
-  gray: ['#b2b2b2', '#c7c7c7'],
-  rainbow: ['#a863ee', '#bd88f2'],
+  // [accent, hover, text color on top of the accent]
+  red: ['#f15562', '#f47b85', '#ffffff'],
+  pink: ['#f155b0', '#f47bc2', '#ffffff'],
+  purple: ['#b055f1', '#c27bf4', '#ffffff'],
+  blue: ['#5596f1', '#7badf4', '#ffffff'],
+  cyan: ['#55caf1', '#7bd6f4', '#0b1a20'],
+  green: ['#55f196', '#7bf4ad', '#0b1f12'],
+  yellow: ['#f1d255', '#f4dc7b', '#1a1400'],
+  gray: ['#b2b2b2', '#c7c7c7', '#14101c'],
+  black: ['#8c8c9c', '#a8a8b8', '#14101c'],
+  rainbow: ['#a863ee', '#bd88f2', '#ffffff'],
 };
 
 const SUB_NEON_COLORS = {
@@ -2162,6 +2183,10 @@ const SUB_NEON_COLORS = {
   green: '#39ff6a',
   purple: '#c23bff',
   gray: '#e8e8e8',
+  pink: '#ff6bd5',
+  cyan: '#3be8ff',
+  yellow: '#ffe83b',
+  black: '#f2f2ff',
   rainbow: '#ffd700',
 };
 const SUB_FILL_DEFAULT = '#ffffff';
@@ -2376,7 +2401,8 @@ els.subBadgeTwitchBtn.addEventListener('click', async () => {
 });
 
 function applyThemeAccent(palette) {
-  const [accent, hover] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
+  const [accent, hover, onAccent] = THEME_ACCENT_COLORS[palette] || THEME_ACCENT_COLORS.red;
+  document.documentElement.style.setProperty('--on-accent', onAccent || '#ffffff');
   document.documentElement.style.setProperty('--theme-accent', accent);
   document.documentElement.style.setProperty('--theme-accent-hover', hover);
   wheelAccent = accent;
@@ -2405,7 +2431,9 @@ if (swatchBox) {
     b.title = opt.textContent;
     b.style.background = opt.value === 'rainbow'
       ? 'conic-gradient(#e33, #ea3, #3c4, #3ae, #93e, #e33)'
-      : (THEME_ACCENT_COLORS[opt.value] || THEME_ACCENT_COLORS.red)[0];
+      : opt.value === 'black'
+        ? '#0b0b10'
+        : (THEME_ACCENT_COLORS[opt.value] || THEME_ACCENT_COLORS.red)[0];
     b.addEventListener('click', () => {
       els.colorPaletteSelect.value = opt.value;
       els.colorPaletteSelect.dispatchEvent(new Event('change'));
