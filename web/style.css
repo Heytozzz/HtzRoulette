@@ -1572,3 +1572,7 @@ body.custom-layout .auto-sw { position: static; margin-top: 4px; }
 .wheel-section { padding-bottom: 54px; }
 .auto-sw { bottom: 12px; }
 body.custom-layout .wheel-section { padding-bottom: 0; }
+
+/* Ko-fi link: same round chip as the other header buttons */
+.kofi-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.kofi-btn img { width: 25px; height: auto; display: block; }
