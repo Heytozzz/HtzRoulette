@@ -365,6 +365,7 @@ function updateSettingsVisibility() {
   els.subBonusRow.classList.toggle('hidden', !els.subBonusCheckbox.checked);
   document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
   syncPaletteSwatches();
+  syncRangeValues();
 
   drawWheel();
 }
@@ -2158,6 +2159,9 @@ els.gearBtn.addEventListener('click', () => {
 els.closeAppearanceModal.addEventListener('click', () => {
   els.appearanceModal.classList.add('hidden');
 });
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') els.appearanceModal.classList.add('hidden');
+});
 
 els.appearanceModal.addEventListener('click', (e) => {
   if (e.target === els.appearanceModal) els.appearanceModal.classList.add('hidden');
@@ -2418,12 +2422,32 @@ els.colorPaletteSelect.addEventListener('change', () => {
 
 // Palette swatches on the main page; they drive the same select as the settings window
 function syncPaletteSwatches() {
-  document.querySelectorAll('#paletteSwatches button').forEach((b) => {
+  document.querySelectorAll('.palette-swatches button').forEach((b) => {
     b.classList.toggle('on', b.dataset.p === els.colorPaletteSelect.value);
   });
+  // preview of the slice colors of the chosen palette (settings window)
+  const strip = document.getElementById('paletteStrip');
+  if (strip) {
+    strip.innerHTML = '';
+    for (let i = 0; i < 10; i += 1) {
+      const c = document.createElement('i');
+      c.style.background = slicePaint(i, 10).color;
+      strip.appendChild(c);
+    }
+  }
 }
-const swatchBox = document.getElementById('paletteSwatches');
-if (swatchBox) {
+
+// "100%" readouts next to the sliders of the settings window
+function syncRangeValues() {
+  document.querySelectorAll('.val[data-for]').forEach((v) => {
+    const input = document.getElementById(v.dataset.for);
+    if (input) v.textContent = `${input.value}%`;
+  });
+}
+document.addEventListener('input', (ev) => {
+  if (ev.target.matches && ev.target.matches('input[type="range"]')) syncRangeValues();
+});
+document.querySelectorAll('.palette-swatches').forEach((swatchBox) => {
   [...els.colorPaletteSelect.options].forEach((opt) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -2440,8 +2464,8 @@ if (swatchBox) {
     });
     swatchBox.appendChild(b);
   });
-  syncPaletteSwatches();
-}
+});
+syncPaletteSwatches();
 
 els.exportBtn.addEventListener('click', async () => {
   const text = state.participants.join('\n');

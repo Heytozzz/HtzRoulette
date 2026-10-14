@@ -316,5 +316,14 @@
   "presetCyan": "Celeste",
   "presetYellow": "Amarillo",
   "presetBlack": "Negro",
-  "kofiTitle": "Apoyar en Ko-fi"
+  "kofiTitle": "Apoyar en Ko-fi",
+  "cardWindow": "Ventana",
+  "soundPackRow": "Pack",
+  "presetRow": "Preset",
+  "titleRow": "Título",
+  "newThemeNameLabel": "Nombre del tema",
+  "cardModCmds": "Comandos de moderación",
+  "cardOverlays": "Fuentes de navegador para OBS",
+  "cardDebug": "Disposición libre",
+  "subBadgeIconLabel": "Icono de sub del canal"
 }
