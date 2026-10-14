@@ -285,6 +285,13 @@ async function loadStrings() {
     const key = el.getAttribute('data-i18n-title');
     if (strings[key]) el.setAttribute('title', strings[key]);
   });
+  // Texts that CSS shows through attr(): the idle hint of the banner and "nothing yet" in the logs
+  ['idle', 'empty'].forEach((name) => {
+    document.querySelectorAll(`[data-i18n-${name}]`).forEach((el) => {
+      const key = el.getAttribute(`data-i18n-${name}`);
+      if (strings[key]) el.dataset[name] = strings[key];
+    });
+  });
 }
 
 function t(key, vars = {}) {
@@ -339,12 +346,22 @@ function updateSettingsVisibility() {
   const canAuto = mode === 'elimination' || (mode === 'winners' && els.winnersSubMode.value === 'sequential');
   els.autoModeRow.classList.toggle('hidden', !canAuto);
   els.subBonusRow.classList.toggle('hidden', !els.subBonusCheckbox.checked);
+  document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
+  syncPaletteSwatches();
 
   drawWheel();
 }
 
 [els.modeSelect, els.eliminationSubMode, els.winnersSubMode, els.subBonusCheckbox].forEach((el) => {
   el.addEventListener('change', updateSettingsVisibility);
+});
+
+// Segmented mode control: the (hidden) select stays the source of truth
+document.querySelectorAll('#modeSeg button').forEach((b) => {
+  b.addEventListener('click', () => {
+    els.modeSelect.value = b.dataset.m;
+    els.modeSelect.dispatchEvent(new Event('change'));
+  });
 });
 
 els.manualSubCheckbox.addEventListener('change', () => {
@@ -421,6 +438,8 @@ function syncRecentOrder() {
 
 function renderParticipants() {
   syncRecentOrder();
+  const slots = document.getElementById('participantCount');
+  if (slots) slots.textContent = t('slotsCount', { n: state.participants.length });
   els.participantList.innerHTML = '';
   if (state.participants.length === 0) {
     if (!IS_OVERLAY) {
@@ -2337,7 +2356,33 @@ els.colorPaletteSelect.addEventListener('change', () => {
   state.colorPalette = els.colorPaletteSelect.value;
   applyThemeAccent(state.colorPalette);
   drawWheel();
+  syncPaletteSwatches();
 });
+
+// Palette swatches on the main page; they drive the same select as the settings window
+function syncPaletteSwatches() {
+  document.querySelectorAll('#paletteSwatches button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.p === els.colorPaletteSelect.value);
+  });
+}
+const swatchBox = document.getElementById('paletteSwatches');
+if (swatchBox) {
+  [...els.colorPaletteSelect.options].forEach((opt) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.p = opt.value;
+    b.title = opt.textContent;
+    b.style.background = opt.value === 'rainbow'
+      ? 'conic-gradient(#e33, #ea3, #3c4, #3ae, #93e, #e33)'
+      : (THEME_ACCENT_COLORS[opt.value] || THEME_ACCENT_COLORS.red)[0];
+    b.addEventListener('click', () => {
+      els.colorPaletteSelect.value = opt.value;
+      els.colorPaletteSelect.dispatchEvent(new Event('change'));
+    });
+    swatchBox.appendChild(b);
+  });
+  syncPaletteSwatches();
+}
 
 els.exportBtn.addEventListener('click', async () => {
   const text = state.participants.join('\n');

@@ -1261,7 +1261,9 @@ body[style*="background-image: url"]::before,
 body.overlay-mode::before { display: none; }
 
 /* glass surfaces */
-header, .participants, .participants-controls, .logs-box, .eliminated-panel, .wheel-box, .settings {
+header, .participants, .wheel-section, .right-column, .options-row,
+body.custom-layout .participants-controls, body.custom-layout .logs-box, body.custom-layout .eliminated-panel,
+body.custom-layout .wheel-box, body.custom-layout .settings {
   position: relative;
   background: var(--glass);
   border: 1px solid var(--glass-edge);
@@ -1440,3 +1442,66 @@ body.custom-layout .eliminated-panel ul, body.custom-layout .logs-box ul { displ
 body.custom-layout .logs-box ul { height: 120px; flex: none; }
 body.custom-layout .settings { width: 520px; }
 body.custom-layout .participants-controls { width: 300px; }
+
+/* ==========================================================================
+   Five panels (as in the prototype): header | participants | wheel + message |
+   eliminated + winners | options. Inside a panel the boxes are transparent; in
+   the free layout (debug) every box is its own glass panel again.
+   ========================================================================== */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 20px; align-items: center; }
+.header-top { display: contents; }
+.title-wrap { grid-column: 1; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+#statusText { color: var(--muted); font-size: 13px; }
+.header-actions { grid-column: 2; grid-row: 1 / 3; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.icons { display: flex; gap: 8px; }
+.conn { grid-column: 1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.connection-bar, .join-command-bar { display: contents; }
+.connection-bar input, .join-command-bar input { width: auto; }
+#joinStatusText, .cmd-status { color: var(--muted); font-size: 13px; margin: 0; }
+
+.participants h2 small { font: 500 13px var(--body); color: var(--muted); margin-left: 8px; }
+.add-participant { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.add-row { display: flex; gap: 6px; align-items: center; }
+.add-row input[type="text"] { flex: 1; }
+.add-row select { width: auto; }
+
+.wheel-section { border-radius: 40px; padding: 22px 18px 18px; gap: 12px; }
+.right-column { border-radius: 26px; }
+.right-column .fill-wrap { padding: 18px; gap: 16px; }
+.options-row { border-radius: 26px; padding: 18px 22px; grid-template-columns: minmax(0, 3fr) minmax(230px, 1fr); gap: 20px 28px; }
+.opts-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+body:not(.custom-layout) .eliminated-panel, body:not(.custom-layout) .logs-box, body:not(.custom-layout) .settings,
+body:not(.custom-layout) .participants-controls, body:not(.custom-layout) .wheel-box {
+  background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0; border-radius: 0;
+}
+.wheel-box { cursor: pointer; }
+.eliminated-panel ul:empty::before, .logs-box ul:empty::before { content: attr(data-empty); color: var(--muted); font-size: 13px; }
+#winnerText:empty::before { content: attr(data-idle); font: 500 15px var(--body); color: var(--muted); text-shadow: none; letter-spacing: 0; }
+
+.seg { display: flex; background: var(--chip); border-radius: 14px; padding: 3px; gap: 3px; grid-column: 1 / -1; }
+.seg button { flex: 1; border: 0; background: transparent; border-radius: 11px; padding: 7px 8px; }
+.seg button.on { background: var(--accent); color: #fff; font-weight: 700; }
+.participants-controls { gap: 9px; }
+.participants-controls .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.participants-controls .reset-btn { background: var(--chip); }
+.participants-controls .reset-btn:hover:not(:disabled) { background: var(--accent-soft); }
+.participants-controls textarea { rows: 2; min-height: 44px; }
+.swatches { display: flex; gap: 7px; margin-top: 2px; }
+.swatches button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--glass-edge); }
+.swatches button.on { border-color: var(--text); transform: scale(1.15); }
+
+@media (max-width: 1100px) {
+  .options-row { grid-template-columns: 1fr; }
+  .opts-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+}
+@media (max-width: 900px) {
+  header { grid-template-columns: 1fr; }
+  .header-actions { grid-column: 1; grid-row: auto; align-items: flex-start; }
+  .right-column .fill-wrap { position: static; }
+  .right-column { padding: 0; }
+}
+body.custom-layout .options-row, body.custom-layout .opts-grid { display: contents; }
+body.custom-layout .opts-grid .grp { display: grid; }
