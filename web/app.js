@@ -245,7 +245,7 @@ SUB_STYLE_KEYS.forEach((k) => {
 });
 
 const ctx = els.wheelCanvas.getContext('2d');
-const PALETTE_HUES = { red: 0, blue: 210, green: 120, purple: 275, gray: 0 };
+const PALETTE_HUES = { red: 355, blue: 215, green: 145, purple: 275, gray: 0 };
 
 // h/s/l of a slice: brighter than before (the red palette no longer turns brown),
 // going from a base color to a lighter one and back as the wheel fills up.
@@ -292,6 +292,7 @@ async function loadStrings() {
       if (strings[key]) el.dataset[name] = strings[key];
     });
   });
+  if (typeof syncSwitches === 'function') syncSwitches();
 }
 
 function t(key, vars = {}) {
@@ -380,6 +381,7 @@ function applyWheelScale(scaleValue) {
   const size = Math.round(WHEEL_BASE_SIZE * (scaleValue / 100));
   els.wheelCanvas.width = size;
   els.wheelCanvas.height = size;
+  els.wheelCanvas.style.setProperty('--wheel-size', `${size}px`);
   drawWheel();
   refreshLayoutMetrics();
 }
@@ -2068,6 +2070,35 @@ els.joinCommandInput.addEventListener('change', () => {
 els.startJoinBtn.addEventListener('click', () => setJoinAccepted(true));
 els.stopJoinBtn.addEventListener('click', () => setJoinAccepted(false));
 
+// One switch per pair of buttons (connect/disconnect, accept/stop joins). The original
+// buttons stay in the page, hidden, as the single source of truth: the switch clicks the
+// one that applies and mirrors their disabled state.
+const connectSwitch = document.getElementById('connectSwitch');
+const joinSwitch = document.getElementById('joinSwitch');
+function syncSwitches() {
+  const connected = !els.disconnectBtn.disabled;
+  const connecting = els.connectBtn.disabled && els.disconnectBtn.disabled;
+  const joining = !els.stopJoinBtn.disabled;
+  const paint = (sw, on, key, busy = false) => {
+    if (!sw) return;
+    sw.setAttribute('aria-checked', String(on));
+    sw.disabled = busy;
+    sw.querySelector('.sw-label').textContent = t(`${key}${on ? 'On' : 'Off'}`);
+    sw.title = t(`${key.replace('switch', 'switch')}Title${on ? 'On' : 'Off'}`);
+  };
+  paint(connectSwitch, connected, 'switchConnect', connecting);
+  paint(joinSwitch, joining, 'switchJoin');
+}
+if (connectSwitch) {
+  connectSwitch.addEventListener('click', () => (els.disconnectBtn.disabled ? els.connectBtn : els.disconnectBtn).click());
+  joinSwitch.addEventListener('click', () => (els.stopJoinBtn.disabled ? els.startJoinBtn : els.stopJoinBtn).click());
+  const watcher = new MutationObserver(syncSwitches);
+  [els.connectBtn, els.disconnectBtn, els.startJoinBtn, els.stopJoinBtn].forEach((b) => {
+    watcher.observe(b, { attributes: true, attributeFilter: ['disabled'] });
+  });
+  syncSwitches();
+}
+
 els.wheelBox.addEventListener('click', (e) => {
   if (e.target.closest('.eliminated-panel')) return;
   spin();
@@ -2117,12 +2148,12 @@ els.appearanceModal.addEventListener('click', (e) => {
 });
 
 const THEME_ACCENT_COLORS = {
-  red: ['#c1121f', '#e14a4a'],
-  blue: ['#1261c1', '#4d9de8'],
-  green: ['#2ea52e', '#55c955'],
-  purple: ['#6a1cad', '#8b3fd1'],
-  gray: ['#6b6b6b', '#8a8a8a'],
-  rainbow: ['#6441a5', '#7d5bbe'],
+  red: ['#f15562', '#f47b85'],
+  blue: ['#5596f1', '#7badf4'],
+  green: ['#55f196', '#7bf4ad'],
+  purple: ['#b055f1', '#c27bf4'],
+  gray: ['#b2b2b2', '#c7c7c7'],
+  rainbow: ['#a863ee', '#bd88f2'],
 };
 
 const SUB_NEON_COLORS = {

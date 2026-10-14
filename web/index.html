@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=31" />
+  <link rel="stylesheet" href="style.css?v=32" />
 </head>
 <body>
   <header>
@@ -29,14 +29,16 @@
       <div class="connection-bar">
         <label class="sr-only" for="channelInput" data-i18n="channelLabel">Canal de Twitch</label>
         <input id="channelInput" type="text" data-i18n-placeholder="channelPlaceholder" placeholder="nombre_del_canal" />
-        <button id="connectBtn" class="primary" data-i18n="connect">Conectar</button>
-        <button id="disconnectBtn" data-i18n="disconnect" disabled>Desconectar</button>
+        <button id="connectSwitch" class="sw" type="button" role="switch" aria-checked="false"><span class="knob"></span><span class="sw-label">Conectar</span></button>
+        <button id="connectBtn" hidden data-i18n="connect">Conectar</button>
+        <button id="disconnectBtn" hidden data-i18n="disconnect" disabled>Desconectar</button>
       </div>
       <div class="join-command-bar">
         <label class="sr-only" for="joinCommandInput" data-i18n="joinCommandLabel">Comando para unirse</label>
         <input id="joinCommandInput" type="text" value="!join" size="8" />
-        <button id="startJoinBtn" class="primary" data-i18n="startJoinBtn">Aceptar ingresos</button>
-        <button id="stopJoinBtn" data-i18n="stopJoinBtn" disabled>Detener ingresos</button>
+        <button id="joinSwitch" class="sw" type="button" role="switch" aria-checked="false"><span class="knob"></span><span class="sw-label">Aceptar ingresos</span></button>
+        <button id="startJoinBtn" hidden data-i18n="startJoinBtn">Aceptar ingresos</button>
+        <button id="stopJoinBtn" hidden data-i18n="stopJoinBtn" disabled>Detener ingresos</button>
         <label class="inline-label tog">
           <input id="subsOnlyCheckbox" type="checkbox" />
           <span data-i18n="subsOnlyLabel">Solo suscriptores</span>
@@ -549,7 +551,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=34"></script>
+  <script src="app.js?v=35"></script>
   <script src="backup.js?v=1"></script>
 </body>
 </html>

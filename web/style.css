@@ -1505,3 +1505,51 @@ body:not(.custom-layout) .participants-controls, body:not(.custom-layout) .wheel
 }
 body.custom-layout .options-row, body.custom-layout .opts-grid { display: contents; }
 body.custom-layout .opts-grid .grp { display: grid; }
+
+/* ==========================================================================
+   Fit the screen: centered content, no scrolling on a normal monitor. The wheel
+   takes whatever height is left (container units), the side panels sit next to it.
+   ========================================================================== */
+body:not(.overlay-mode) { min-height: 100vh; display: flex; flex-direction: column; }
+header { width: min(100% - 40px, 1240px); margin: 14px auto 0; padding: 12px 20px; gap: 8px 20px; }
+main { width: 100%; max-width: 1280px; margin: 0 auto; flex: 1 1 auto; min-height: 520px; padding: 14px 20px 18px; gap: 16px; grid-template-rows: minmax(0, 1fr) auto; }
+h1 { font-size: 24px; }
+.header-actions { gap: 4px; }
+.join-hint { font-size: 30px; }
+.gear-btn { width: 38px; height: 38px; }
+.conn { gap: 8px; }
+#joinStatusText { display: none; }
+
+.left-column, .right-column { min-height: 0; }
+.wheel-section { min-height: 0; padding: 16px 16px 14px; gap: 8px; }
+body:not(.custom-layout) .wheel-stage { flex: 1 1 0; min-height: 300px; width: 100%; container-type: size; display: grid; place-items: center; }
+body:not(.custom-layout) main #wheelCanvas { width: min(100cqw, 100cqh, var(--wheel-size, 9999px)); height: min(100cqw, 100cqh, var(--wheel-size, 9999px)); }
+.messages-box { flex: none; gap: 4px; }
+#winnerText { min-height: 44px; font-size: clamp(20px, 2.6vw, 28px); padding: 4px 22px; }
+#modeStatus { min-height: 0; padding: 0; font-size: 12px; }
+
+.options-row { padding: 12px 20px; gap: 12px 24px; }
+.opts-grid { gap: 12px 24px; }
+.grp { gap: 6px 12px; }
+.grp > h3, .participants-controls > h3 { margin-bottom: 0; }
+.grp input, .grp select { padding: 4px 10px; }
+.seg button { padding: 5px 8px; }
+.participants-controls { gap: 6px; }
+.participants-controls button { padding: 6px 12px; }
+.participants-controls textarea, #importExportArea { height: 34px; min-height: 34px; padding: 5px 10px; }
+.swatches button { width: 22px; height: 22px; }
+
+/* switch buttons: one button that turns on and off */
+.sw { display: inline-flex; align-items: center; gap: 9px; padding: 6px 14px 6px 8px; color: var(--muted); white-space: nowrap; }
+.sw .knob { position: relative; width: 30px; height: 18px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); transition: background 0.15s; flex: none; }
+.sw .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.sw[aria-checked="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.sw[aria-checked="true"] .knob { background: var(--accent); }
+.sw[aria-checked="true"] .knob::after { transform: translateX(12px); }
+.sw:disabled { opacity: 0.6; cursor: progress; }
+
+@media (max-width: 900px) {
+  header { width: calc(100% - 24px); }
+  main { min-height: 0; padding: 14px 12px 18px; }
+  body:not(.custom-layout) .wheel-stage { flex: none; height: min(100vw, 520px); }
+}

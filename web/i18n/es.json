@@ -303,5 +303,13 @@
   "modeWinnersShort": "Ganadores",
   "slotsCount": "{n} cupos",
   "spinHint": "Haz clic en la ruleta para girar",
-  "emptyLog": "Aún nada"
+  "emptyLog": "Aún nada",
+  "switchConnectOff": "Conectar",
+  "switchConnectOn": "Conectado",
+  "switchConnectTitleOff": "Conectar al chat",
+  "switchConnectTitleOn": "Desconectar",
+  "switchJoinOff": "Aceptar ingresos",
+  "switchJoinOn": "Ingresos abiertos",
+  "switchJoinTitleOff": "Aceptar ingresos por comando",
+  "switchJoinTitleOn": "Detener ingresos"
 }
