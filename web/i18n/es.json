@@ -233,8 +233,8 @@
   "imagesBtnTitle": "Imágenes",
   "imagesTitle": "Imágenes",
   "imageWinNone": "— Elige una imagen —",
-  "imageWinEmpty": "Todavía no hay presets de imagen.",
-  "imageWinPick": "Elige un preset en el menú del botón 🖼.",
+  "imageWinEmpty": "Todavía no hay presets de imagen. Haz clic aquí o arrastra una imagen para crear el primero.",
+  "imageWinPick": "Elige un preset en el menú del botón 🖼, o haz clic aquí / arrastra una imagen para crear uno nuevo.",
   "imageWinCreate": "Crear preset",
   "tabImages": "Imágenes",
   "imagesShowLabel": "Mostrar la ventana de imágenes",
@@ -325,5 +325,10 @@
   "cardModCmds": "Comandos de moderación",
   "cardOverlays": "Fuentes de navegador para OBS",
   "cardDebug": "Disposición libre",
-  "subBadgeIconLabel": "Icono de sub del canal"
+  "subBadgeIconLabel": "Icono de sub del canal",
+  "imageWinDropHint": "Suelta la imagen para crear un preset",
+  "imageWinNamePlaceholder": "Nombre del preset",
+  "imageWinNameSave": "Guardar",
+  "imageWinNameCancel": "Cancelar",
+  "imageWinNameReplace": "Ya existe un preset con ese nombre: se reemplazará su imagen."
 }

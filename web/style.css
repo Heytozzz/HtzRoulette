@@ -1650,3 +1650,89 @@ body.custom-layout .wheel-section { padding-bottom: 0; }
 }
 .modal-box input[type="password"] { background: var(--chip); color: var(--text); border: 1px solid var(--glass-edge); border-radius: 14px; padding: 7px 12px; min-width: 0; }
 .modal-box .small-btn { font-size: 14px; padding: 7px 14px; }
+
+/* ==========================================================================
+   Floating windows (timer, images) and the menu of the image button: glass
+   panels with the display font, a gradient line under the title and round
+   close buttons (same design as the approved prototype).
+   ========================================================================== */
+.float-window {
+  display: flex; flex-direction: column; border-radius: 24px; overflow: hidden;
+  background: rgba(20, 17, 30, 0.78); border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(20px) saturate(1.3); -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 30px 60px -28px var(--accent), 0 16px 40px -16px #000;
+}
+.float-window[hidden] { display: none !important; }
+.float-header { position: relative; padding: 10px 10px 10px 18px; border-bottom: 0; flex-shrink: 0; }
+.float-header::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
+.float-title { font: 800 15px/1.2 var(--display); letter-spacing: -0.01em; }
+.float-close { width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--chip); border: 1px solid var(--glass-edge); color: var(--text); font-size: 15px; line-height: 1; flex: none; }
+.float-close:hover { background: var(--accent-soft); color: var(--text); }
+
+/* timer */
+.timer-widget { width: 272px; }
+.timer-body { padding: 14px 16px 16px; }
+.timer-view { gap: 12px; }
+.timer-presets { gap: 8px; }
+.timer-presets button { padding: 12px 0; font-weight: 700; }
+.timer-display { font: 800 54px/1 var(--display); letter-spacing: -0.03em; padding: 6px 0 2px; }
+.timer-widget[data-status="finished"] .timer-display { text-shadow: 0 0 26px var(--accent-soft); }
+.timer-progress { height: 8px; border-radius: 999px; background: var(--chip); }
+.timer-progress-bar { border-radius: 999px; background: var(--accent); box-shadow: 0 0 12px var(--accent-soft); }
+.timer-status { font-size: 13px; color: var(--muted); }
+.timer-controls { gap: 8px; }
+.timer-controls button { background: var(--accent); border-color: transparent; color: var(--on-accent, #fff); font-weight: 700; }
+.timer-controls button:hover:not(:disabled) { background: var(--accent); filter: brightness(1.1); }
+.timer-controls button.secondary, .timer-widget button.secondary { background: var(--chip); border: 1px solid var(--glass-edge); color: var(--text); font-weight: 400; filter: none; }
+.timer-controls button.secondary:hover:not(:disabled) { background: var(--accent-soft); filter: none; }
+.timer-col { width: 62px; border-radius: 16px; }
+.timer-col:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.timer-col-arrow { color: var(--muted); border: 0; border-radius: 10px; padding: 3px 0; background: transparent; }
+.timer-col-arrow:hover { color: var(--text); background: var(--chip); }
+.timer-col-item { height: 32px; border-radius: 12px; font-size: 16px; color: var(--muted); background: transparent; border: 0; }
+.timer-col-item:hover { background: var(--chip); }
+.timer-col-item.selected { background: var(--accent); color: var(--on-accent, #fff); }
+.timer-col-label { color: var(--muted); margin-top: 3px; }
+.timer-colon { font: 800 22px var(--display); }
+
+/* images window */
+.images-widget .float-header { border-bottom: 0; min-height: 0; }
+.images-title { font: 800 18px/1.2 var(--display); letter-spacing: -0.01em; }
+.images-body { padding: 2px 12px 12px; gap: 0; }
+.images-view { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--glass-edge); border-radius: 18px; }
+.images-view.is-empty { cursor: pointer; }
+.images-empty { color: var(--muted); }
+.images-widget::after {
+  content: ""; position: absolute; right: 4px; bottom: 4px; width: 22px; height: 22px; pointer-events: none; opacity: 0.7; z-index: 3;
+  background: linear-gradient(135deg, transparent 52%, var(--muted) 52% 58%, transparent 58% 70%, var(--muted) 70% 76%, transparent 76%);
+}
+.images-drop {
+  position: absolute; inset: 8px; z-index: 6; display: grid; place-items: center; text-align: center; padding: 16px;
+  border: 2px dashed var(--accent); border-radius: 20px; background: var(--accent-soft); font-weight: 700; pointer-events: none;
+}
+.images-name {
+  position: absolute; inset: 0; z-index: 4; display: grid; align-content: center; gap: 10px; padding: 14px;
+  background: rgba(14, 11, 22, 0.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.images-name img { max-width: 100%; max-height: 96px; justify-self: center; object-fit: contain; border-radius: 12px; background: rgba(0, 0, 0, 0.35); }
+.images-name input { width: 100%; }
+.images-name .ctl { display: flex; gap: 8px; }
+.images-name .ctl button { flex: 1; }
+.images-name-note { margin: 0; min-height: 16px; font-size: 12px; color: var(--muted); text-align: center; }
+.images-notice {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 5; margin: 0; padding: 7px 12px; text-align: center;
+  font-size: 13px; border-radius: 12px; background: rgba(14, 11, 22, 0.92); border: 1px solid var(--glass-edge);
+}
+
+/* menu of the image button */
+.images-menu {
+  width: 262px; gap: 12px; padding: 14px; border-radius: 22px; background: rgba(20, 17, 30, 0.78); border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 24px 50px -24px var(--accent), 0 12px 30px -14px #000;
+}
+.images-menu::before {
+  content: ""; position: absolute; top: -6px; left: var(--caret, 200px); width: 12px; height: 12px; background: rgba(20, 17, 30, 0.95);
+  border-left: 1px solid var(--glass-edge); border-top: 1px solid var(--glass-edge); transform: rotate(45deg); border-radius: 3px 0 0 0;
+}
+.images-menu .menu-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+.images-menu-label { color: var(--muted); font-size: 13px; }

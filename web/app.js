@@ -177,6 +177,15 @@ const els = {
   imageWinEmpty: document.getElementById('imageWinEmpty'),
   imageWinMessage: document.getElementById('imageWinMessage'),
   imageWinCreateBtn: document.getElementById('imageWinCreateBtn'),
+  imageWinFile: document.getElementById('imageWinFile'),
+  imageWinDrop: document.getElementById('imageWinDrop'),
+  imageWinNameBox: document.getElementById('imageWinNameBox'),
+  imageWinNameThumb: document.getElementById('imageWinNameThumb'),
+  imageWinNameInput: document.getElementById('imageWinNameInput'),
+  imageWinNameNote: document.getElementById('imageWinNameNote'),
+  imageWinNameSave: document.getElementById('imageWinNameSave'),
+  imageWinNameCancel: document.getElementById('imageWinNameCancel'),
+  imageWinNotice: document.getElementById('imageWinNotice'),
   imagesShowCheckbox: document.getElementById('imagesShowCheckbox'),
   newImageTitle: document.getElementById('newImageTitle'),
   newImageFile: document.getElementById('newImageFile'),
@@ -3734,7 +3743,8 @@ function positionImagesMenu() {
   const width = els.imagesMenu.offsetWidth;
   const left = Math.min(window.innerWidth - width - 8, Math.max(8, button.right - width));
   els.imagesMenu.style.left = `${left}px`;
-  els.imagesMenu.style.top = `${button.bottom + 6}px`;
+  els.imagesMenu.style.top = `${button.bottom + 10}px`;
+  els.imagesMenu.style.setProperty('--caret', `${Math.round(button.left + button.width / 2 - left - 6)}px`);
 }
 
 function setImagesMenuOpen(open) {
@@ -3770,9 +3780,9 @@ function renderImagePresetLists() {
 // Shows the picked preset in the window (or the matching empty message)
 async function showImagePreset(title) {
   const token = ++imageShowToken;
-  // The preset's name is the window's only title
-  els.imagesTitleText.textContent = title;
-  els.imagesTitleText.title = title;
+  // The preset's name is the window's only title ("Imágenes" while none is selected)
+  els.imagesTitleText.textContent = title || t('tabImages');
+  els.imagesTitleText.title = title || t('tabImages');
   let url = null;
   if (title) {
     const data = await loadImagePreset(title).catch(() => null);
@@ -3785,9 +3795,9 @@ async function showImagePreset(title) {
   else els.imageWinImg.removeAttribute('src');
   els.imageWinImg.hidden = !url;
   els.imageWinEmpty.hidden = !!url;
+  els.imageWinEmpty.parentElement.classList.toggle('is-empty', !url);
   const hasPresets = imagePresetTitles.length > 0;
   els.imageWinMessage.textContent = t(hasPresets ? 'imageWinPick' : 'imageWinEmpty');
-  els.imageWinCreateBtn.hidden = hasPresets;
 }
 
 // Preview + delete button for the preset picked in the settings list
@@ -3823,6 +3833,107 @@ async function refreshImagePresets() {
   renderImagePresetLists();
   await showImagePreset(imageSettings.selected);
   saveImageSettings();
+}
+
+// --- New preset from the floating window: drop an image on it, or click it while no
+// image is selected; then a name field opens before saving. ---
+let pendingImage = null; // { file, url }
+let imageNoticeTimer = null;
+
+function showImageNotice(key) {
+  els.imageWinNotice.textContent = t(key);
+  els.imageWinNotice.hidden = false;
+  clearTimeout(imageNoticeTimer);
+  imageNoticeTimer = setTimeout(() => { els.imageWinNotice.hidden = true; }, 3000);
+}
+
+function closeImageNameBox() {
+  els.imageWinNameBox.hidden = true;
+  if (pendingImage) URL.revokeObjectURL(pendingImage.url);
+  pendingImage = null;
+  els.imageWinNameThumb.removeAttribute('src');
+}
+
+function updateImageNameNote() {
+  const title = els.imageWinNameInput.value.trim();
+  els.imageWinNameNote.textContent = title && imagePresetTitles.includes(title) ? t('imageWinNameReplace') : '';
+}
+
+function startNewImagePreset(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showImageNotice('imageStatusNotImage'); return; }
+  closeImageNameBox();
+  pendingImage = { file, url: URL.createObjectURL(file) };
+  els.imageWinNameThumb.src = pendingImage.url;
+  els.imageWinNameInput.value = file.name.replace(/\.[^.]+$/, '').slice(0, 80); // file name as a suggestion
+  updateImageNameNote();
+  els.imageWinNameBox.hidden = false;
+  els.imageWinNameInput.focus();
+  els.imageWinNameInput.select();
+}
+
+async function confirmNewImagePreset() {
+  if (!pendingImage) return;
+  const title = els.imageWinNameInput.value.trim();
+  if (!title) { els.imageWinNameNote.textContent = t('imageStatusNoTitle'); els.imageWinNameInput.focus(); return; }
+  try {
+    await saveImagePreset(title, pendingImage.file);
+  } catch (err) {
+    console.error('Could not save the image preset:', err);
+    els.imageWinNameNote.textContent = t('imageStatusError');
+    return;
+  }
+  closeImageNameBox();
+  imageSettings.selected = title;
+  await refreshImagePresets();
+}
+
+function initImageWindowDrop() {
+  const widget = els.imagesWidget;
+  const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  let depth = 0;
+  widget.addEventListener('dragenter', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth += 1;
+    els.imageWinDrop.hidden = false;
+  });
+  widget.addEventListener('dragover', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  widget.addEventListener('dragleave', (e) => {
+    if (!hasFiles(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (!depth) els.imageWinDrop.hidden = true;
+  });
+  widget.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth = 0;
+    els.imageWinDrop.hidden = true;
+    const file = [...e.dataTransfer.files].find((f) => f.type.startsWith('image/'));
+    if (file) startNewImagePreset(file);
+    else showImageNotice('imageStatusNotImage');
+  });
+
+  const view = els.imageWinEmpty.parentElement;
+  const pickFile = () => { els.imageWinFile.value = ''; els.imageWinFile.click(); };
+  view.addEventListener('click', (e) => {
+    if (!view.classList.contains('is-empty') || !els.imageWinNameBox.hidden) return;
+    if (e.target === els.imageWinCreateBtn) return; // its own handler
+    pickFile();
+  });
+  els.imageWinCreateBtn.addEventListener('click', pickFile);
+  els.imageWinFile.addEventListener('change', () => startNewImagePreset(els.imageWinFile.files[0]));
+  els.imageWinNameInput.addEventListener('input', updateImageNameNote);
+  els.imageWinNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); confirmNewImagePreset(); }
+    if (e.key === 'Escape') { e.stopPropagation(); closeImageNameBox(); }
+  });
+  els.imageWinNameSave.addEventListener('click', confirmNewImagePreset);
+  els.imageWinNameCancel.addEventListener('click', closeImageNameBox);
 }
 
 async function saveImagePresetFromForm() {
@@ -3937,10 +4048,7 @@ async function initImages() {
     saveImageSettings();
     showImagePreset(imageSettings.selected);
   });
-  els.imageWinCreateBtn.addEventListener('click', () => {
-    els.gearBtn.click();
-    showSettingsTab('images');
-  });
+  initImageWindowDrop();
   els.saveImagePresetBtn.addEventListener('click', saveImagePresetFromForm);
   els.deleteImagePresetBtn.addEventListener('click', deleteSelectedImagePreset);
   els.renameImageBtn.addEventListener('click', renameSelectedImagePreset);
