@@ -330,5 +330,10 @@
   "imageWinNamePlaceholder": "Nombre del preset",
   "imageWinNameSave": "Guardar",
   "imageWinNameCancel": "Cancelar",
-  "imageWinNameReplace": "Ya existe un preset con ese nombre: se reemplazará su imagen."
+  "imageWinNameReplace": "Ya existe un preset con ese nombre: se reemplazará su imagen.",
+  "idleSpinLabel": "Giro lento en espera",
+  "idleSpeedLabel": "Velocidad en espera",
+  "idleSpeedVerySlow": "Muy lenta",
+  "idleSpeedSlow": "Lenta",
+  "idleSpeedMedium": "Media"
 }

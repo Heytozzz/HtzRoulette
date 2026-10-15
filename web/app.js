@@ -123,6 +123,8 @@ const els = {
   winnersCountInput: document.getElementById('winnersCountInput'),
   autoModeRow: document.getElementById('autoModeRow'),
   autoModeCheckbox: document.getElementById('autoModeCheckbox'),
+  idleSpinCheckbox: document.getElementById('idleSpinCheckbox'),
+  idleSpinSpeed: document.getElementById('idleSpinSpeed'),
   autoWaitInput: document.getElementById('autoWaitInput'),
   eliminatedLogList: document.getElementById('eliminatedLogList'),
   winnersLogList: document.getElementById('winnersLogList'),
@@ -1441,6 +1443,7 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
     if (progress >= 1) {
       finished = true;
       state.animating = false;
+      idleResumeAt = performance.now() + 2500; // the result stays still for a moment
       els.spinStyleSelect.disabled = false;
       bgTimers.clear(watchdog);
       onDone();
@@ -1458,6 +1461,37 @@ function runSpinAnimation({ startRotation, targetRotation, duration, sliceAngle,
   }, 30);
   requestAnimationFrame(frame);
 }
+// --- Slow idle rotation: the wheel creeps around while nobody is spinning ---
+// It eases in (and out of the way when a spin starts: spin() begins from the current angle).
+// Overlays run it on their own and are told whether it is on, how fast, and whether to hold.
+let idleResumeAt = 0;
+let idleRamp = 0;
+let idleLast = 0;
+const overlayIdle = { on: false, speed: 6, hold: false };
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function idleSettings() {
+  if (IS_OVERLAY) return { on: overlayIdle.on && !overlayIdle.hold && !overlaySpinning, speed: overlayIdle.speed };
+  return { on: els.idleSpinCheckbox.checked && !state.spinning, speed: Number(els.idleSpinSpeed.value) || 6 };
+}
+
+function idleTick(now) {
+  requestAnimationFrame(idleTick);
+  const elapsed = now - idleLast;
+  if (elapsed < 33) return; // ~30 fps is plenty for a slow turn
+  idleLast = now;
+  const dt = Math.min(0.1, elapsed / 1000);
+  const idle = idleSettings();
+  if (!idle.on || reducedMotion.matches || document.hidden || state.animating || performance.now() < idleResumeAt) {
+    idleRamp = 0;
+    return;
+  }
+  idleRamp = Math.min(1, idleRamp + dt / 1.5);
+  state.rotation += (idle.speed * idleRamp * dt * Math.PI) / 180;
+  drawWheel();
+}
+if (!IS_OVERLAY || OVERLAY_TYPE === 'wheel') requestAnimationFrame(idleTick);
+
 // What the end of this spin means, so the right sound can be scheduled up front:
 // 'final' = a final winner is chosen, 'select' = someone is picked but the game goes on.
 // (Mirrors the decisions in onSpinComplete.)
@@ -2844,6 +2878,8 @@ function saveState() {
       winnersCount: els.winnersCountInput.value,
       autoMode: els.autoModeCheckbox.checked,
       autoWait: els.autoWaitInput.value,
+      idleSpin: els.idleSpinCheckbox.checked,
+      idleSpeed: els.idleSpinSpeed.value,
       subBonusEnabled: els.subBonusCheckbox.checked,
       subExtraTier1: els.subExtraTier1.value,
       subExtraTier2: els.subExtraTier2.value,
@@ -2899,6 +2935,8 @@ async function applySavedState() {
   if (data.winnersSubMode != null) els.winnersSubMode.value = data.winnersSubMode;
   if (data.winnersCount != null) els.winnersCountInput.value = data.winnersCount;
   els.autoModeCheckbox.checked = !!data.autoMode;
+  els.idleSpinCheckbox.checked = data.idleSpin !== false; // on by default
+  if (['3', '6', '12'].includes(String(data.idleSpeed))) els.idleSpinSpeed.value = String(data.idleSpeed);
   if (data.autoWait != null) els.autoWaitInput.value = data.autoWait;
   els.subBonusCheckbox.checked = !!data.subBonusEnabled;
   if (data.subExtraTier1 != null) els.subExtraTier1.value = data.subExtraTier1;
@@ -2953,7 +2991,7 @@ async function applySavedState() {
 [
   els.spinDurationInput, els.modeSelect, els.eliminationSubMode, els.eliminationArrowCount,
   els.eliminationFinalWinnersCount, els.winnersSubMode, els.winnersCountInput, els.autoModeCheckbox,
-  els.autoWaitInput, els.subBonusCheckbox, els.subExtraTier1, els.subExtraTier2, els.subExtraTier3,
+  els.autoWaitInput, els.idleSpinCheckbox, els.idleSpinSpeed, els.subBonusCheckbox, els.subExtraTier1, els.subExtraTier2, els.subExtraTier3,
   els.colorPaletteSelect, els.wheelScaleSlider, els.wheelFontSizeSlider, els.rouletteImageModeSelect, els.joinCommandInput,
   els.subsOnlyCheckbox, els.cmdPrefixInput, els.modCmdEnabled, els.modCmdAllowMods, els.modCmdWhitelist,
 ].forEach((el) => el.addEventListener('change', saveState));
@@ -4082,6 +4120,7 @@ const OVERLAY_SETTING_KEYS = [
   'eliminationFinalWinnersCount', 'winnersSubMode', 'winnersCountInput',
 ];
 const overlaySid = Math.random().toString(36).slice(2);
+let overlayRotationSeen = false;
 const overlayConns = new Set();
 const overlayDataUrls = new Map();
 let overlaySeq = 0;
@@ -4142,6 +4181,9 @@ function overlaySnapshot() {
     eliminatedLog: state.eliminatedLog,
     winnersLog: state.winnersLog,
     rotation: state.rotation,
+    idleSpin: els.idleSpinCheckbox.checked,
+    idleSpeed: Number(els.idleSpinSpeed.value) || 6,
+    idleHold: state.spinning,
     colorPalette: state.colorPalette,
     subColors: state.subColors,
     subText: getSubTextSettings(),
@@ -4290,7 +4332,12 @@ function applyOverlayState(m, keepRotation) {
   state.subNames = new Set(m.subNames);
   state.eliminatedLog = m.eliminatedLog;
   state.winnersLog = m.winnersLog;
-  if (!keepRotation) state.rotation = m.rotation;
+  overlayIdle.on = !!m.idleSpin;
+  overlayIdle.speed = Number(m.idleSpeed) || 6;
+  overlayIdle.hold = !!m.idleHold;
+  // While the overlay idles on its own, do not snap it to the host's angle (it would jerk on every join)
+  if (!keepRotation && !(overlayIdle.on && overlayRotationSeen)) state.rotation = m.rotation;
+  overlayRotationSeen = true;
   state.colorPalette = m.colorPalette;
   if (m.subColors) state.subColors = m.subColors;
   if (m.subText) applySubTextSettings(m.subText);
@@ -4332,9 +4379,17 @@ function handleOverlayMessage(m) {
     if (overlaySpinning) return;
     overlaySpinning = true;
     els.winnerText.textContent = '';
+    // If the overlay is idling, start from its own angle and land on the same slice as the host
+    let { startRotation, targetRotation } = m;
+    if (overlayIdle.on) {
+      const turns = Math.floor((m.targetRotation - m.startRotation) / (Math.PI * 2));
+      startRotation = state.rotation;
+      targetRotation = startRotation
+        + normalizeAngle(normalizeAngle(m.targetRotation) - normalizeAngle(startRotation)) + turns * Math.PI * 2;
+    }
     runSpinAnimation({
-      startRotation: m.startRotation,
-      targetRotation: m.targetRotation,
+      startRotation,
+      targetRotation,
       duration: m.duration,
       endKind: m.endKind,
       sliceAngle: (Math.PI * 2) / Math.max(1, state.participants.length),

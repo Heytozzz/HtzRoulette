@@ -152,6 +152,13 @@
               <option value="wheel" data-i18n="spinStyleWheel">Normal</option>
               <option value="arrows" data-i18n="spinStyleArrows">Girar las flechas</option>
             </select>
+            <label class="tog"><input id="idleSpinCheckbox" type="checkbox" checked /><span data-i18n="idleSpinLabel">Giro lento en espera</span></label>
+            <label data-i18n="idleSpeedLabel">Velocidad en espera</label>
+            <select id="idleSpinSpeed">
+              <option value="3" data-i18n="idleSpeedVerySlow">Muy lenta</option>
+              <option value="6" data-i18n="idleSpeedSlow" selected>Lenta</option>
+              <option value="12" data-i18n="idleSpeedMedium">Media</option>
+            </select>
             <div id="autoModeRow" class="mode-options hidden">
               <label data-i18n="autoWaitLabel">Espera entre giros (segundos)</label>
               <input id="autoWaitInput" type="number" min="0" max="30" step="0.5" value="3" />
@@ -488,7 +495,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
   <script src="backup.js?v=1"></script>
 </body>
 </html>
