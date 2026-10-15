@@ -1504,12 +1504,18 @@ function removeIndices(indices) {
   state.participants = state.participants.filter((_, i) => !indexSet.has(i));
 }
 
+// The switch is read live: a spin that is already running must not chain into another one
+// if auto mode was turned off meanwhile (the settings snapshot of that spin is stale).
 function scheduleAutoSpin(waitMs) {
   bgTimers.clear(state.autoTimer);
+  if (!els.autoModeCheckbox.checked) return;
   state.autoTimer = bgTimers.timeout(() => {
-    spin();
+    if (els.autoModeCheckbox.checked) spin();
   }, waitMs);
 }
+els.autoModeCheckbox.addEventListener('change', () => {
+  if (!els.autoModeCheckbox.checked) bgTimers.clear(state.autoTimer);
+});
 
 function onSpinComplete(selection, settings) {
   state.spinning = false;
@@ -1549,7 +1555,7 @@ function onSpinComplete(selection, settings) {
       return;
     }
 
-    if (settings.autoMode) {
+    if (els.autoModeCheckbox.checked) {
       scheduleAutoSpin(settings.autoWaitMs);
     }
     return;
@@ -1583,7 +1589,7 @@ function onSpinComplete(selection, settings) {
       return;
     }
 
-    if (settings.autoMode) {
+    if (els.autoModeCheckbox.checked) {
       scheduleAutoSpin(settings.autoWaitMs);
     }
   }
